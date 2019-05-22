@@ -55,12 +55,11 @@ object Demand_1199 {
   def loadData(spark: SparkSession, start: LocalDate, end: LocalDate): Unit = {
     import spark.implicits._
     var curDay = start
-
     val dateFormat = DateTimeFormatter.ofPattern("yyyy-MM-dd")
-    //val savePath = "s3://vomkt-emr-rec/testresult/d_1199/"
-    val savePath = "d://vomkt-emr-rec/testresult/d_1199/"
+    val savePath = "s3://vomkt-emr-rec/testresult/d_1199/"
     val s3DateFormat = DateTimeFormatter.ofPattern("yyyy-MM-dd-HH")
     while (curDay.compareTo(end) <= 0) {
+      println(curDay.toString)
       val nextDay = curDay.plusDays(1)
       val s3Start = LocalDateTime.parse(curDay.format(dateFormat) + "-00", s3DateFormat)
       val s3End = LocalDateTime.parse(nextDay.format(dateFormat) + "-00", s3DateFormat)
@@ -72,9 +71,9 @@ object Demand_1199 {
             case ("mob", "screen_view", "product_detail", country, _, _) => Some(cmsEvents(e.domain_userid, country, "proudct_detail"))
             case ("mob", "screen_view", "cart", country, _, _) => Some(cmsEvents(e.domain_userid, country, "cart"))
             case ("mob", "order_process", _, country, _, "button_cart_checkout") => Some(cmsEvents(e.domain_userid, country, "cart_buy_confirm"))
-            case ("mob", "screen_view", "button_cart_checkout", country, app_uri, _) => if (app_uri.contains("login_type=login")) Some(cmsEvents(e.domain_userid, country, "login_tab")) else None
+            case ("mob", "screen_view", "button_cart_checkout", country, app_uri, _) => if (app_uri != null && app_uri.contains("login_type=login")) Some(cmsEvents(e.domain_userid, country, "login_tab")) else None
             case ("mob", "screen_view", "checkout", country, _, _) => Some(cmsEvents(e.domain_userid, country, "checkout"))
-            case ("mob", "screen_view", "login_and_register", country, app_uri, _) => if (app_uri.contains("login_type=register")) Some(cmsEvents(e.domain_userid, country, "register_tab")) else None
+            case ("mob", "screen_view", "login_and_register", country, app_uri, _) => if (app_uri != null && app_uri.contains("login_type=register")) Some(cmsEvents(e.domain_userid, country, "register_tab")) else None
             case ("mob", "order_process", _, country, _, "button_checkout_placeOrder") => Some(cmsEvents(e.domain_userid, country, "checkout_place_order"))
             case ("mob", "screen_view", "payment_cod_verify", country, _, _) => Some(cmsEvents(e.domain_userid, country, "payment_cod_verify"))
             case ("mob", "screen_view", "payment_success", country, _, _) => Some(cmsEvents(e.domain_userid, country, "payment_success"))
@@ -95,45 +94,54 @@ object Demand_1199 {
 
         val dataLayer3 = dataLayer2
           .groupBy("tag")
-          .pivot("tag")
           .agg(functions.approx_count_distinct("domain_userid").alias("uv"))
           .withColumn("event_date", functions.lit(curDay.format(dateFormat)))
           .withColumn("country_code", functions.lit(country))
         dataLayer3.cache()
         dataLayer3.show(truncate = false)
-        dataLayer3.write.mode(SaveMode.Append).parquet(savePath + "data/")
+        dataLayer3.coalesce(1).write.mode(SaveMode.Append).parquet(savePath + "data/")
       })
-        curDay = nextDay
-      }
+      curDay = nextDay
     }
-
-    def main(args: Array[String]): Unit = {
-      val appName = "d_1199"
-      println(appName)
-      //    val spark = SparkSession.builder
-      //      .master("yarn")
-      //      .appName(appName)
-      //      .config("spark.serializer", "org.apache.spark.serializer.KryoSerializer")
-      //      .config("spark.yarn.maxAppAttempts", 1)
-      //      .config("spark.sql.session.timeZone", "UTC")
-      //      .getOrCreate()
-      //spark.sparkContext.setCheckpointDir("s3://vomkt-emr-rec/checkpoint/")
-
-      //local
-      val spark = SparkSession.builder
-        .master("local[*]")
-        .appName(appName)
-        .config("spark.serializer", "org.apache.spark.serializer.KryoSerializer")
-        .config("spark.sql.session.timeZone", "UTC")
-        .getOrCreate()
-      spark.sparkContext.setLogLevel("WARN")
-
-      val dateFormat = DateTimeFormatter.ofPattern("yyyy-MM-dd")
-      val start: LocalDate = LocalDate.parse("2019-03-01", dateFormat)
-      val end: LocalDate = LocalDate.parse("2019-05-21", dateFormat)
-      loadData(spark, start, end)
-      spark.stop()
-    }
+    spark.read
+      .parquet(savePath + "data/")
+      .groupBy("event_date", "country_code")
+      .pivot("tag", Seq("dau", "proudct_detail", "cart", "cart_buy_confirm", "login_tab", "register_tab", "checkout", "checkout_place_order", "payment_cod_verify", "payment_success"))
+      .sum("uv")
+      .coalesce(1)
+      .write
+      .option("header", "true")
+      .mode(SaveMode.Append)
+      .csv(savePath + "data_final/")
   }
+
+  def main(args: Array[String]): Unit = {
+    val appName = "d_1199"
+    println(appName)
+        val spark = SparkSession.builder
+          .master("yarn")
+          .appName(appName)
+          .config("spark.serializer", "org.apache.spark.serializer.KryoSerializer")
+          .config("spark.yarn.maxAppAttempts", 1)
+          .config("spark.sql.session.timeZone", "UTC")
+          .getOrCreate()
+    spark.sparkContext.setCheckpointDir("s3://vomkt-emr-rec/checkpoint/")
+
+    //local
+//    val spark = SparkSession.builder
+//      .master("local[*]")
+//      .appName(appName)
+//      .config("spark.serializer", "org.apache.spark.serializer.KryoSerializer")
+//      .config("spark.sql.session.timeZone", "UTC")
+//      .getOrCreate()
+//    spark.sparkContext.setLogLevel("WARN")
+
+    val dateFormat = DateTimeFormatter.ofPattern("yyyy-MM-dd")
+    val start: LocalDate = LocalDate.parse("2019-03-01", dateFormat)
+    val end: LocalDate = LocalDate.parse("2019-05-21", dateFormat)
+    loadData(spark, start, end)
+    spark.stop()
+  }
+}
 
 
