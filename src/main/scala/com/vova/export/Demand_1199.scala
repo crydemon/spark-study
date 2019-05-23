@@ -6,7 +6,7 @@ import java.time.format.DateTimeFormatter
 import com.snowplowanalytics.snowplow.analytics.scalasdk.Event
 import com.vova.snowplow.schema.cx.Common
 import com.vova.snowplow.schema.ue.CommonClick
-import com.vova.utils.S3
+import com.vova.utils.{S3, S3Config}
 import io.circe.JsonObject
 import org.apache.spark.sql.{SaveMode, SparkSession, functions}
 
@@ -63,7 +63,7 @@ object Demand_1199 {
       val nextDay = curDay.plusDays(1)
       val s3Start = LocalDateTime.parse(curDay.format(dateFormat) + "-00", s3DateFormat)
       val s3End = LocalDateTime.parse(nextDay.format(dateFormat) + "-00", s3DateFormat)
-      val enrichData = S3.loadEnrichData(spark, s3Start, s3End)
+      val dataLayer1 = S3.loadEnrichData(spark, s3Start, s3End)
         .flatMap { row =>
           val e = new cmsEvent(row)
           (e.platform, e.event_name, e.common_context.page_code, e.common_context.country, e.common_context.uri, e.common_click_event.element_name) match {
@@ -80,26 +80,21 @@ object Demand_1199 {
             case _ => None
           }
         }
-      enrichData.write.mode(SaveMode.Overwrite).parquet(savePath + "tmp/")
-
-      val dataLayer1 = spark.read.parquet(savePath + "tmp/")
       dataLayer1.cache()
       val countryS = Seq("all", "FR", "DE", "IT", "GB", "US", "ID", "BE")
-      enrichData.show(truncate = false)
       countryS.foreach(country => {
         val dataLayer2 = country match {
           case "all" => dataLayer1
           case code => dataLayer1.filter($"country" === code)
         }
 
-        val dataLayer3 = dataLayer2
+        dataLayer2
           .groupBy("tag")
           .agg(functions.approx_count_distinct("domain_userid").alias("uv"))
           .withColumn("event_date", functions.lit(curDay.format(dateFormat)))
           .withColumn("country_code", functions.lit(country))
-        dataLayer3.cache()
-        dataLayer3.show(truncate = false)
-        dataLayer3.coalesce(1).write.mode(SaveMode.Append).parquet(savePath + "data/")
+          .write
+          .mode(SaveMode.Append).parquet(savePath + "data/")
       })
       curDay = nextDay
     }
@@ -118,23 +113,25 @@ object Demand_1199 {
   def main(args: Array[String]): Unit = {
     val appName = "d_1199"
     println(appName)
-        val spark = SparkSession.builder
-          .master("yarn")
-          .appName(appName)
-          .config("spark.serializer", "org.apache.spark.serializer.KryoSerializer")
-          .config("spark.yarn.maxAppAttempts", 1)
-          .config("spark.sql.session.timeZone", "UTC")
-          .getOrCreate()
+    val spark = SparkSession.builder
+      .master("yarn")
+      .appName(appName)
+      .config("spark.serializer", "org.apache.spark.serializer.KryoSerializer")
+      .config("spark.yarn.maxAppAttempts", 1)
+      .config("spark.sql.session.timeZone", "UTC")
+      .getOrCreate()
     spark.sparkContext.setCheckpointDir("s3://vomkt-emr-rec/checkpoint/")
 
-    //local
-//    val spark = SparkSession.builder
-//      .master("local[*]")
-//      .appName(appName)
-//      .config("spark.serializer", "org.apache.spark.serializer.KryoSerializer")
-//      .config("spark.sql.session.timeZone", "UTC")
-//      .getOrCreate()
-//    spark.sparkContext.setLogLevel("WARN")
+    //    local
+    //    val spark = SparkSession.builder
+    //      .master("local[*]")
+    //      .appName(appName)
+    //      .config("spark.serializer", "org.apache.spark.serializer.KryoSerializer")
+    //      .config("spark.sql.session.timeZone", "UTC")
+    //      .getOrCreate()
+    //    spark.sparkContext.setLogLevel("WARN")
+    //    spark.sparkContext.hadoopConfiguration.set("fs.s3.access.key", S3Config.keyId)
+    //    spark.sparkContext.hadoopConfiguration.set("fs.s3.secret.key", S3Config.accessKey)
 
     val dateFormat = DateTimeFormatter.ofPattern("yyyy-MM-dd")
     val start: LocalDate = LocalDate.parse("2019-03-01", dateFormat)
