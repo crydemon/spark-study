@@ -39,3 +39,5 @@ libraryDependencies += "com.snowplowanalytics" %% "snowplow-scala-analytics-sdk"
 libraryDependencies += "io.circe" %% "circe-core" % "0.11.1"
 
 
+
+

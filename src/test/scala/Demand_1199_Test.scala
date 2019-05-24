@@ -1,7 +1,8 @@
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
 
-import com.vova.export.Demand_1199
+
+import com.vova.export.Demand_1199.loadData
 import com.vova.utils.S3Config
 import org.apache.spark.sql.SparkSession
 
@@ -15,15 +16,15 @@ object Demand_1199_Test {
     spark.sparkContext.setLogLevel("WARN")
     import spark.implicits._
 
-    spark.sparkContext.hadoopConfiguration.set("fs.s3a.path.style.access", "true")
-    spark.sparkContext.hadoopConfiguration.set("fs.s3a.access.key", S3Config.keyId)
-    spark.sparkContext.hadoopConfiguration.set("fs.s3a.secret.key", S3Config.accessKey)
+    spark.sparkContext.hadoopConfiguration.set("fs.s3.path.style.access", "true")
+    spark.sparkContext.hadoopConfiguration.set("fs.s3.access.key", S3Config.keyId)
+    spark.sparkContext.hadoopConfiguration.set("fs.s3.secret.key", S3Config.accessKey)
 
-    val dateFormat = DateTimeFormatter.ofPattern("yyyy/MM/dd")
-    val start:LocalDate = LocalDate.parse("2019/03/01", dateFormat)
-    val end:LocalDate = LocalDate.parse("2019/05/21",  dateFormat)
-    println(start.toString, end.toString)
-    Demand_1199.loadData(spark, start, end)
+    val dateFormat = DateTimeFormatter.ofPattern("yyyy-MM-dd")
+    val start: LocalDate = LocalDate.parse("2019-03-01", dateFormat)
+    val end: LocalDate = LocalDate.parse("2019-03-01", dateFormat)
+    loadData(spark, start, end)
+    spark.stop()
     spark.stop()
   }
 }

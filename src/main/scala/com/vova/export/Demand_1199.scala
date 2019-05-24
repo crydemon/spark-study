@@ -4,8 +4,9 @@ import java.time.{LocalDate, LocalDateTime}
 import java.time.format.DateTimeFormatter
 
 import com.snowplowanalytics.snowplow.analytics.scalasdk.Event
-import com.vova.snowplow.schema.cx.Common
-import com.vova.snowplow.schema.ue.CommonClick
+import com.vova.snowplow.schema.VovaEventHelper.{VENDOR_ARTEMIS, VENDOR_GOOGLE}
+import com.vova.snowplow.schema.cx.{AppCommon, Common}
+import com.vova.snowplow.schema.ue.{CommonClick, EcommerceAction, OrderProcess}
 import com.vova.utils.{S3, S3Config}
 import io.circe.JsonObject
 import org.apache.spark.sql.{SaveMode, SparkSession, functions}
@@ -44,7 +45,12 @@ class cmsEvent(val event: Event) {
 
   lazy val event_name: String = raw_event_name.split("-").head
 
-  lazy val common_click_event: CommonClick = new CommonClick(getUnstructEvent(cmsEvent.VENDOR_ARTEMIS, "common_click-link_click"))
+  lazy val common_click_event: CommonClick = new CommonClick(getUnstructEvent(VENDOR_ARTEMIS, "common_click-link_click"))
+
+  lazy val app_common_context: AppCommon = new AppCommon(getContext(VENDOR_ARTEMIS, "app_common"))
+  lazy val order_process_event: OrderProcess = new OrderProcess(getUnstructEvent(VENDOR_ARTEMIS, "order_process"))
+  lazy val ecommerce_action_event: EcommerceAction = new EcommerceAction(getUnstructEvent(VENDOR_GOOGLE, "enhanced_ecommerce_action"))
+
 }
 
 case class cmsEvents(domain_userid: String, country: String, tag: String)
@@ -56,7 +62,7 @@ object Demand_1199 {
     import spark.implicits._
     var curDay = start
     val dateFormat = DateTimeFormatter.ofPattern("yyyy-MM-dd")
-    val savePath = "s3://vomkt-emr-rec/testresult/d_1199/"
+    val savePath = "d://vomkt-emr-rec/testresult/d_1199/"
     val s3DateFormat = DateTimeFormatter.ofPattern("yyyy-MM-dd-HH")
     while (curDay.compareTo(end) <= 0) {
       println(curDay.toString)
@@ -66,12 +72,12 @@ object Demand_1199 {
       val dataLayer1 = S3.loadEnrichData(spark, s3Start, s3End)
         .flatMap { row =>
           val e = new cmsEvent(row)
-          (e.platform, e.event_name, e.common_context.page_code, e.common_context.country, e.common_context.uri, e.common_click_event.element_name) match {
+          (e.platform, e.event_name, e.common_context.page_code, e.common_context.country, e.app_common_context.uri, e.order_process_event.element_name) match {
             case ("mob", _, "homepage", country, _, _) => Some(cmsEvents(e.domain_userid, country, "dau"))
             case ("mob", "screen_view", "product_detail", country, _, _) => Some(cmsEvents(e.domain_userid, country, "proudct_detail"))
             case ("mob", "screen_view", "cart", country, _, _) => Some(cmsEvents(e.domain_userid, country, "cart"))
             case ("mob", "order_process", _, country, _, "button_cart_checkout") => Some(cmsEvents(e.domain_userid, country, "cart_buy_confirm"))
-            case ("mob", "screen_view", "button_cart_checkout", country, app_uri, _) => if (app_uri != null && app_uri.contains("login_type=login")) Some(cmsEvents(e.domain_userid, country, "login_tab")) else None
+            case ("mob", "screen_view", "login_and_register", country, app_uri, _) => if (app_uri != null && app_uri.contains("login_type=login")) Some(cmsEvents(e.domain_userid, country, "login_tab")) else None
             case ("mob", "screen_view", "checkout", country, _, _) => Some(cmsEvents(e.domain_userid, country, "checkout"))
             case ("mob", "screen_view", "login_and_register", country, app_uri, _) => if (app_uri != null && app_uri.contains("login_type=register")) Some(cmsEvents(e.domain_userid, country, "register_tab")) else None
             case ("mob", "order_process", _, country, _, "button_checkout_placeOrder") => Some(cmsEvents(e.domain_userid, country, "checkout_place_order"))

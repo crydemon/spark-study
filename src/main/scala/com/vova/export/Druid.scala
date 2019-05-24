@@ -129,12 +129,15 @@ object DruidSQL {
       .select("uv", "cur_day")
       .withColumnRenamed("uv", "auction_house_uv")
 
+
+    //新人教程
     where =
       """
         | and element_name = 'auctionNewUsersCourseImp'
         | and event_name = 'common_click'
         | and list_uri = 'auction_click_imp'
         | and element_content = 'auctionhouse'
+        | and country in('DE', 'ES')
       """.stripMargin
 
     val d2 = Druid.loadData(Druid.query(fromHit(startTime, endTime, where)), spark)
