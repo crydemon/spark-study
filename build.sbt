@@ -32,11 +32,14 @@ libraryDependencies += "mysql" % "mysql-connector-java" % "8.0.12"
 
 // https://mvnrepository.com/artifact/org.typelevel/cats-core
 libraryDependencies += "org.typelevel" %% "cats-core" % "1.6.0"
-
-
-libraryDependencies += "com.snowplowanalytics" %% "snowplow-scala-analytics-sdk" % "0.4.1" exclude("com.amazonaws", "aws-java-sdk-s3") exclude("com.amazonaws", "aws-java-sdk-dynamodb")
 // https://mvnrepository.com/artifact/io.circe/circe-core
 libraryDependencies += "io.circe" %% "circe-core" % "0.11.1"
+
+libraryDependencies += "com.snowplowanalytics" %% "snowplow-scala-analytics-sdk" % "0.4.1" exclude("com.amazonaws", "aws-java-sdk-s3") exclude("com.amazonaws", "aws-java-sdk-dynamodb")
+
+// https://mvnrepository.com/artifact/com.squareup.okhttp3/okhttp
+libraryDependencies += "com.squareup.okhttp3" % "okhttp" % "3.14.2"
+
 
 
 

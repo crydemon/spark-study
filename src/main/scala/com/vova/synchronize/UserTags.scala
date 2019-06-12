@@ -52,6 +52,11 @@ object UserTags {
       |(
       |    `device_id`            varchar(64) NOT NULL DEFAULT '',
       |    `user_id`              int(11)     NOT NULL DEFAULT '0',
+      |    `idfa`                 varchar(64),
+      |    `idfv`                 varchar(64),
+      |    `currency`             varchar(8),
+      |    `advertising_id`       varchar(64),
+      |    `bundle_id`            varchar(64),
       |    `country_code`         varchar(2)  NOT NULL DEFAULT '',
       |    `platform`             varchar(8)  NOT NULL DEFAULT '',
       |    `channel`              varchar(64)          DEFAULT '',
@@ -77,7 +82,8 @@ object UserTags {
       |    KEY `country_code` (`country_code`),
       |    KEY `activate_date` (`activate_date`),
       |    KEY `create_time` (`create_time`)
-      |) ENGINE = MyISAM  DEFAULT CHARSET = utf8mb4 COMMENT ='用户分层';
+      |) ENGINE = MyISAM
+      |  DEFAULT CHARSET = utf8mb4 COMMENT ='用户分层';
     """.stripMargin
   }
 

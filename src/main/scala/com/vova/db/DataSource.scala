@@ -106,7 +106,7 @@ class DataSource(configPath: String) {
         val insertSql = insertData + lines
         try {
           val status = statement.executeUpdate(insertSql)
-          println(s"insert:$status")
+          //println(s"insert:$status")
         } catch {
           case e: Exception => {
             println("insert error")
@@ -127,7 +127,7 @@ class DataSource(configPath: String) {
     val statement = connection.prepareStatement(sql)
     try {
       val status = statement.executeUpdate()
-      println(status)
+      //println(status)
     } catch {
       case e: Exception => {
         println(sql)

@@ -38,7 +38,7 @@ object Druid {
     spark
       .read
       .json(normal.split("\n").toSeq.toDS)
-      .withColumn("pay_date", $"cur_day".substr(0, 10))
+    //.withColumn("pay_date", $"cur_day".substr(0, 10))
   }
 
 }
@@ -60,6 +60,95 @@ object DruidSQL {
         """.stripMargin
     println(sql)
     sql
+  }
+
+  def hourFromHit(startTime: String, endTime: String, where: String): String = {
+    val sql =
+      s"""
+         |SELECT
+         | floor(__time to day) AS cur_day,
+         | floor(__time to hour) AS cur_hour,
+         | count(DISTINCT domain_userid) AS uv,
+         | count(1)  AS pv
+         |FROM hit
+         |WHERE  __time >= TIMESTAMP '$startTime'
+         |    AND __time < TIMESTAMP '$endTime'
+         |    $where
+         |group by floor(__time to day), floor(__time to hour)
+        """.stripMargin
+    println(sql)
+    sql
+  }
+
+  def fromGoodsCtrV2(startTime: String, endTime: String, where: String): String = {
+    val sql =
+      s"""
+         |SELECT
+         | goods_id,
+         | sum(clicks) AS sum_clicks,
+         | sum(impressions) AS sum_impressions
+         |FROM goods_ctr_v2
+         |WHERE  __time >= TIMESTAMP '$startTime'
+         |    AND __time < TIMESTAMP '$endTime'
+         |    $where
+         |group by goods_id
+        """.stripMargin
+    println(sql)
+    sql
+  }
+
+  def d_1334(spark: SparkSession): Unit = {
+    import spark.implicits._
+    val startTime = "2019-05-01 00:00:00"
+    val endTime = "2019-06-11 00:00:00"
+    val where = " and page_code = 'newuser_exclucivepage'"
+    val d1 = Druid.loadData(Druid.query(fromGoodsCtrV2(startTime, endTime, where)), spark)
+      .cache()
+    d1.coalesce(1)
+      .write
+      .mode(SaveMode.Append)
+      .option("header", true)
+      .csv("d:/d_1334/")
+  }
+
+  def d_1238(spark: SparkSession): Unit = {
+    import spark.implicits._
+    val startTime = "2019-04-24 00:00:00"
+    val endTime = "2019-05-25 00:00:00"
+
+    val goodsSale = spark
+      .read
+      .option("header", "true")
+      .csv("d:/midden_sale.csv")
+
+    goodsSale.cache()
+
+
+    val goodsIds = goodsSale
+      .map(row => row.getAs[String]("goods_id"))
+      .collectAsList()
+      .toArray.mkString(",")
+
+    var where =
+      s"""
+         | and goods_id in($goodsIds)
+         | and country in('SA', 'AE', 'BH', 'QA', 'KW')
+      """.stripMargin
+
+    val d1 = Druid.loadData(Druid.query(fromGoodsCtrV2(startTime, endTime, where)), spark)
+
+    d1.cache()
+    goodsSale
+      .withColumnRenamed("goods_id", "goods_id1")
+      .join(d1, $"goods_id" === $"goods_id1", "left")
+      .withColumn("ctr", functions.concat($"sum_clicks" * 100 / $"sum_impressions", functions.lit("%")))
+      .coalesce(1)
+      .write
+      .mode(SaveMode.Append)
+      .option("header", true)
+      .csv("d:/d_1238/")
+
+
   }
 
   def d_1196(spark: SparkSession): Unit = {
@@ -235,6 +324,43 @@ object DruidSQL {
     writeToCSV(data)
   }
 
+
+  def d_1249(spark: SparkSession): Unit = {
+    import spark.implicits._
+    val startTime = "2019-05-20 00:00:00"
+    val endTime = "2019-05-25 00:00:00"
+
+    var where =
+      """
+        | and page_code = 'homepage'
+        | and platform = 'mob'
+        | and country in('SA', 'AE', 'BH', 'QA', 'KW')
+      """.stripMargin
+
+    val d1 = Druid.loadData(Druid.query(hourFromHit(startTime, endTime, where)), spark)
+    d1.cache()
+    val d2 = d1.withColumn("cur_day", functions.to_date($"cur_day"))
+      .withColumn("cur_hour", functions.hour($"cur_hour"))
+
+    val samples = d2.sample(false, 0.1)
+
+    writeToCSV(d2)
+  }
+
+  def any_1(spark: SparkSession): Unit = {
+    import spark.implicits._
+    val newOld = spark.read.option("header", true)
+      .csv("d:/new_old.csv")
+      .withColumnRenamed("luckystar_order_id", "old_order_id").cache()
+    val newNew = spark.read
+      .option("header", true).csv("d:/new_new.csv").cache()
+    println(newOld.count() - newNew.count())
+    val d_1 = newOld
+      .join(newNew, $"luckystar_order_id" === $"old_order_id", "left")
+      .filter($"luckystar_order_id".isNull)
+    d_1.show(20000, truncate = false)
+  }
+
   def writeToCSV(data: DataFrame): Unit = {
     val savePath = "d:/result"
     FileUtils.deleteDirectory(new File(savePath))
@@ -256,8 +382,9 @@ object DruidSQL {
       .config("spark.sql.session.timeZone", "UTC")
       .getOrCreate()
     spark.sparkContext.setLogLevel("WARN")
-    d_1214(spark)
+    d_1334(spark)
     spark.close()
+
   }
 
 

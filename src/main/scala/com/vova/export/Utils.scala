@@ -8,9 +8,6 @@ import org.apache.spark.sql.{DataFrame, Row, SparkSession}
 
 object Utils {
 
-
-
-
   def getFieldsList(data: DataFrame): List[String] = data.schema.map(f => f.name).reverse.toList
 
   def getFields(data: DataFrame): String = data.schema.foldLeft("")((acc, f) => if (acc == "") f.name else acc + "," + f.name)
