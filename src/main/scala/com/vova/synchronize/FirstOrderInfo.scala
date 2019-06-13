@@ -4,6 +4,7 @@ import java.time.LocalDate
 import java.time.format.DateTimeFormatter
 
 import com.vova.db.DataSource
+import com.vova.utils.S3Config
 import org.apache.spark.sql.{SaveMode, SparkSession}
 import org.apache.spark.sql.expressions.Window
 import org.apache.spark.sql.functions._
@@ -13,7 +14,7 @@ object FirstOrderInfo {
 
   def createTable: String =
     """
-      |CREATE TABLE `first_oder_info`
+      |CREATE TABLE `first_order_info`
       |(
       |    `device_id`        varchar(64) NOT NULL DEFAULT '',
       |    `user_id`          int(11)     NOT NULL DEFAULT '0',
@@ -36,10 +37,6 @@ object FirstOrderInfo {
       |  DEFAULT CHARSET = utf8mb4 COMMENT ='首单信息';
     """.stripMargin
 
-  def dropTable: String =
-    """
-      |drop table first_oder_info
-    """.stripMargin
 
   def initTable(spark: SparkSession, start: LocalDate, end: LocalDate): Unit = {
 
@@ -69,10 +66,10 @@ object FirstOrderInfo {
     import spark.implicits._
     val reportDb = new DataSource("themis_report_read")
     val reportDbWriter = new DataSource("themis_report_write")
-//    reportDbWriter.execute(dropTable)
-////    println("drop table success")
-////    reportDbWriter.execute(createTable)
-////    println("create table success")
+    //    reportDbWriter.execute(dropTable)
+    ////    println("drop table success")
+    ////    reportDbWriter.execute(createTable)
+    ////    println("create table success")
     val dateFormat = DateTimeFormatter.ofPattern("yyyy-MM-dd")
     var curDay = start
     while (curDay.compareTo(end) <= 0) {
@@ -114,12 +111,12 @@ object FirstOrderInfo {
          |       unix_timestamp(oi.pay_time) as pay_time,
          |       ar.media_source,
          |       ar.appsflyer_device_id,
-         |       foi.first_oder_id,
+         |       foi.first_order_id,
          |       foi.first_pay_time
          |FROM appsflyer_record ar
          |         INNER JOIN app_event_log_user_start_up su USING (device_id)
          |         INNER JOIN order_info oi USING (device_id)
-         |         LEFT  JOIN first_oder_info USING(device_id)
+         |         LEFT  JOIN first_order_info foi USING(device_id)
          |WHERE oi.pay_time >= '$startTime'
          |  AND oi.pay_time < '$endTime'
          |  AND oi.pay_status >= 1
@@ -142,7 +139,7 @@ object FirstOrderInfo {
       val orderInfoRank = orderInfo
         .withColumn("rank", dense_rank().over(rankSpec))
         .filter($"rank" === 1)
-        .withColumn("first_order_id", coalesce($"first_oder_id", $"order_id", lit(0)))
+        .withColumn("first_order_id", coalesce($"first_order_id", $"order_id", lit(0)))
         .withColumn("first_pay_time", coalesce($"first_pay_time", $"pay_time", lit(0)))
         .select("device_id", "user_id", "idfa",
           "platform", "currency", "advertising_id", "bundle_id", "first_order_id", "first_pay_time", "media_source", "appsflyer_device_id")
@@ -156,55 +153,21 @@ object FirstOrderInfo {
 
   }
 
-  def main(args: Array[String]): Unit = {
-
-    val appName = "first_order_info"
-    println(appName)
-    val spark = SparkSession.builder
-      .master("yarn")
-      .appName(appName)
-      .config("spark.serializer", "org.apache.spark.serializer.KryoSerializer")
-      .config("spark.yarn.maxAppAttempts", 1)
-      .config("spark.sql.session.timeZone", "UTC")
-      .getOrCreate()
-
-    spark.sparkContext.setLogLevel("WARN")
-    spark.sparkContext.setCheckpointDir("s3://vomkt-emr-rec/checkpoint/")
-
-
-    //        val spark = SparkSession.builder
-    //          .appName(appName)
-    //          .master("local[*]")
-    //          .getOrCreate()
-    //        spark.sparkContext.setLogLevel("WARN")
-
-    val dateFormat = DateTimeFormatter.ofPattern("yyyy/MM/dd")
-    //val (start, end) = (LocalDate.parse(args(0), dateFormat), LocalDate.parse(args(1), dateFormat))
-    val (start, end) = (LocalDate.parse(args(0), dateFormat), LocalDate.parse(args(1), dateFormat))
-    //initTable(spark, start, end)
-    updateTable(spark, start, end)
-
-    spark.stop()
-  }
-}
-
-object firstOrderToS3{
-  def upload(spark:SparkSession):Unit = {
+  def upload(spark: SparkSession): Unit = {
     def getPayedInfo: String = {
       s"""
-         |SELECT if(first_order_id = 0, 1, 0) AS is_new_user,
-         |       foi.idfa,
-         |       device_id,
-         |       foi.platform
-         |FROM first_order_info foi
+         |SELECT ut.device_id,
+         |       if(ut.acc_payed_order > 0, 0, 1) AS is_new_user
+         |FROM user_tags ut
     """.stripMargin
     }
+
     val sql = getPayedInfo
     val reportDb = new DataSource("themis_report_read")
     reportDb.load(spark, sql)
       .write
-      .mode(SaveMode.Ignore)
-      .parquet("s3://")
+      .mode(SaveMode.Overwrite)
+      .parquet("s3://vomkt-emr-rec/testresult/first_order_info/")
   }
 
   def main(args: Array[String]): Unit = {
@@ -222,19 +185,16 @@ object firstOrderToS3{
     spark.sparkContext.setLogLevel("WARN")
     spark.sparkContext.setCheckpointDir("s3://vomkt-emr-rec/checkpoint/")
 
-
-    //        val spark = SparkSession.builder
-    //          .appName(appName)
-    //          .master("local[*]")
-    //          .getOrCreate()
-    //        spark.sparkContext.setLogLevel("WARN")
-
+    //    val spark = SparkSession.builder
+    //      .appName(appName)
+    //      .master("local[*]")
+    //      .getOrCreate()
+    //    spark.sparkContext.setLogLevel("WARN")
     val dateFormat = DateTimeFormatter.ofPattern("yyyy/MM/dd")
-    //val (start, end) = (LocalDate.parse(args(0), dateFormat), LocalDate.parse(args(1), dateFormat))
     val (start, end) = (LocalDate.parse(args(0), dateFormat), LocalDate.parse(args(1), dateFormat))
     //initTable(spark, start, end)
     updateTable(spark, start, end)
-
+    upload(spark)
     spark.stop()
   }
 }
