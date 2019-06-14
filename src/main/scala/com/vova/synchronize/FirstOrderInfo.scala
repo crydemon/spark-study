@@ -157,8 +157,9 @@ object FirstOrderInfo {
     def getPayedInfo: String = {
       s"""
          |SELECT ut.device_id,
-         |       if(ut.acc_payed_order > 0, 0, 1) AS is_new_user
+         |       0 AS is_new_user
          |FROM user_tags ut
+         |WHERE ut.acc_payed_order > 0
     """.stripMargin
     }
 
@@ -187,7 +188,7 @@ object FirstOrderInfo {
 
     //    val spark = SparkSession.builder
     //      .appName(appName)
-    //      .master("local[*]")
+    //      .master("local[*]")is_new_user
     //      .getOrCreate()
     //    spark.sparkContext.setLogLevel("WARN")
     val dateFormat = DateTimeFormatter.ofPattern("yyyy/MM/dd")

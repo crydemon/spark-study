@@ -50,13 +50,14 @@ object DruidSQL {
       s"""
          |SELECT
          | floor(__time to day) AS cur_day,
+         | country,
          | count(DISTINCT domain_userid) AS uv,
          | count(1)  AS pv
          |FROM hit
          |WHERE  __time >= TIMESTAMP '$startTime'
          |    AND __time < TIMESTAMP '$endTime'
          |    $where
-         |group by floor(__time to day)
+         |group by floor(__time to day), country
         """.stripMargin
     println(sql)
     sql
@@ -99,57 +100,24 @@ object DruidSQL {
 
   def d_1334(spark: SparkSession): Unit = {
     import spark.implicits._
-    val startTime = "2019-05-01 00:00:00"
+    val startTime = "2019-06-01 00:00:00"
     val endTime = "2019-06-11 00:00:00"
-    val where = " and page_code = 'newuser_exclucivepage'"
-    val d1 = Druid.loadData(Druid.query(fromGoodsCtrV2(startTime, endTime, where)), spark)
+    var where = " and url = '/theme_activity/?case=theme_template_4'"
+    val d1 = Druid.loadData(Druid.query(fromHit(startTime, endTime, where)), spark)
+      .filter($"country".isin("FR", "IT", "DE", "ES", "GB", "NL"))
+      .withColumnRenamed("uv", "theme_template_4_uv")
+      .withColumnRenamed("pv", "theme_template_4_pv")
       .cache()
-    d1.coalesce(1)
-      .write
-      .mode(SaveMode.Append)
-      .option("header", true)
-      .csv("d:/d_1334/")
+    where = " and page_code = 'homepage' and platform = 'mob'"
+    val d2 = Druid.loadData(Druid.query(fromHit(startTime, endTime, where)), spark)
+      .filter($"country".isin("FR", "IT", "DE", "ES", "GB", "NL"))
+      .withColumnRenamed("uv", "homepage_uv")
+      .withColumnRenamed("pv", "homepage_pv")
+      .cache()
+    val d3 = d1.join(d2, Seq("cur_day", "country"))
+    writeToCSV(d3)
   }
 
-  def d_1238(spark: SparkSession): Unit = {
-    import spark.implicits._
-    val startTime = "2019-04-24 00:00:00"
-    val endTime = "2019-05-25 00:00:00"
-
-    val goodsSale = spark
-      .read
-      .option("header", "true")
-      .csv("d:/midden_sale.csv")
-
-    goodsSale.cache()
-
-
-    val goodsIds = goodsSale
-      .map(row => row.getAs[String]("goods_id"))
-      .collectAsList()
-      .toArray.mkString(",")
-
-    var where =
-      s"""
-         | and goods_id in($goodsIds)
-         | and country in('SA', 'AE', 'BH', 'QA', 'KW')
-      """.stripMargin
-
-    val d1 = Druid.loadData(Druid.query(fromGoodsCtrV2(startTime, endTime, where)), spark)
-
-    d1.cache()
-    goodsSale
-      .withColumnRenamed("goods_id", "goods_id1")
-      .join(d1, $"goods_id" === $"goods_id1", "left")
-      .withColumn("ctr", functions.concat($"sum_clicks" * 100 / $"sum_impressions", functions.lit("%")))
-      .coalesce(1)
-      .write
-      .mode(SaveMode.Append)
-      .option("header", true)
-      .csv("d:/d_1238/")
-
-
-  }
 
   def d_1196(spark: SparkSession): Unit = {
     val startTime = "2019-05-13 00:00:00"
@@ -204,148 +172,6 @@ object DruidSQL {
     writeToCSV(data)
   }
 
-  def d_1214(spark: SparkSession): Unit = {
-    val startTime = "2019-05-16 00:00:00"
-    val endTime = "2019-05-22 00:00:00"
-    var where =
-      """
-        | and page_code = 'auction_auctionhouse'
-        | and event_name = 'page_view'
-        | and country in('DE', 'ES')
-      """.stripMargin
-
-    val d1 = Druid.loadData(Druid.query(fromHit(startTime, endTime, where)), spark)
-      .select("uv", "cur_day")
-      .withColumnRenamed("uv", "auction_house_uv")
-
-
-    //新人教程
-    where =
-      """
-        | and element_name = 'auctionNewUsersCourseImp'
-        | and event_name = 'common_click'
-        | and list_uri = 'auction_click_imp'
-        | and element_content = 'auctionhouse'
-        | and country in('DE', 'ES')
-      """.stripMargin
-
-    val d2 = Druid.loadData(Druid.query(fromHit(startTime, endTime, where)), spark)
-      .select("uv", "cur_day")
-      .withColumnRenamed("uv", "tutorial_hall_uv")
-
-    where =
-      """
-        | and element_name = 'auctionNewUsersCourseClose'
-        | and event_name = 'common_click'
-        | and list_uri = 'auction_click'
-        | and element_content = 'auctionHouse'
-      """.stripMargin
-
-    val d3 = Druid.loadData(Druid.query(fromHit(startTime, endTime, where)), spark)
-      .select("uv", "cur_day")
-      .withColumnRenamed("uv", "tutorial_close_hall_uv")
-
-    where =
-      """
-        | and page_code = 'auction_rules'
-        | and event_name = 'page_view'
-        | and country in('DE', 'ES')
-      """.stripMargin
-
-    val d4 = Druid.loadData(Druid.query(fromHit(startTime, endTime, where)), spark)
-      .select("uv", "cur_day")
-      .withColumnRenamed("uv", "rules_uv")
-
-    where =
-      """
-        | and element_name = 'auctionNewUsersCourseClose'
-        | and event_name = 'common_click'
-        | and list_uri = 'auction_click'
-        | and element_content = 'auctionRules'
-        | and country in('DE', 'ES')
-      """.stripMargin
-
-    val d5 = Druid.loadData(Druid.query(fromHit(startTime, endTime, where)), spark)
-      .select("uv", "cur_day")
-      .withColumnRenamed("uv", "tutorial_rules_uv")
-
-    where =
-      """
-        | and element_name = 'auctionNewUsersCourseReplayImp'
-        | and event_name = 'common_click'
-        | and list_uri = 'auction_click_imp'
-        | and country in('DE', 'ES')
-      """.stripMargin
-    val d6 = Druid.loadData(Druid.query(fromHit(startTime, endTime, where)), spark)
-      .select("uv", "cur_day")
-      .withColumnRenamed("uv", "replay_uv")
-
-    where =
-      """
-        | and page_code = 'auction_rules'
-        | and event_name = 'page_view'
-      """.stripMargin
-
-    val d7 = Druid.loadData(Druid.query(fromHit(startTime, endTime, where)), spark)
-      .select("uv", "cur_day")
-      .withColumnRenamed("uv", "rules_all_country_uv")
-
-    where =
-      """
-        | and element_name = 'auctionNewUsersCourseClose'
-        | and event_name = 'common_click'
-        | and list_uri = 'auction_click'
-        | and element_content = 'auctionRules'
-      """.stripMargin
-
-    val d8 = Druid.loadData(Druid.query(fromHit(startTime, endTime, where)), spark)
-      .select("uv", "cur_day")
-      .withColumnRenamed("uv", "tutorial_rules_all_country_uv")
-
-    where =
-      """
-        | and element_name = 'auctionNewUsersCourseReplayImp'
-        | and event_name = 'common_click'
-        | and list_uri = 'auction_click_imp'
-      """.stripMargin
-    val d9 = Druid.loadData(Druid.query(fromHit(startTime, endTime, where)), spark)
-      .select("uv", "cur_day")
-      .withColumnRenamed("uv", "replay_all_country_uv")
-    val data = d1.join(d2, "cur_day")
-      .join(d3, "cur_day")
-      .join(d4, "cur_day")
-      .join(d5, "cur_day")
-      .join(d6, "cur_day")
-      .join(d7, "cur_day")
-      .join(d8, "cur_day")
-      .join(d9, "cur_day")
-
-    data.cache()
-    writeToCSV(data)
-  }
-
-
-  def d_1249(spark: SparkSession): Unit = {
-    import spark.implicits._
-    val startTime = "2019-05-20 00:00:00"
-    val endTime = "2019-05-25 00:00:00"
-
-    var where =
-      """
-        | and page_code = 'homepage'
-        | and platform = 'mob'
-        | and country in('SA', 'AE', 'BH', 'QA', 'KW')
-      """.stripMargin
-
-    val d1 = Druid.loadData(Druid.query(hourFromHit(startTime, endTime, where)), spark)
-    d1.cache()
-    val d2 = d1.withColumn("cur_day", functions.to_date($"cur_day"))
-      .withColumn("cur_hour", functions.hour($"cur_hour"))
-
-    val samples = d2.sample(false, 0.1)
-
-    writeToCSV(d2)
-  }
 
   def any_1(spark: SparkSession): Unit = {
     import spark.implicits._
