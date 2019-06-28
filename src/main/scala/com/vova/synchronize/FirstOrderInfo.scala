@@ -163,12 +163,45 @@ object FirstOrderInfo {
     """.stripMargin
     }
 
-    val sql = getPayedInfo
+    def getGoodsBrand: String = {
+     """
+       |SELECT CASE
+       |           WHEN c.depth = 1
+       |               THEN c.cat_name
+       |           WHEN c_pri.depth = 1
+       |               THEN c_pri.cat_name
+       |           WHEN c_ga.depth = 1
+       |               THEN c_ga.cat_name
+       |           END AS first_class,
+       |       CASE
+       |           WHEN c.depth = 2
+       |               THEN c.cat_name
+       |           WHEN c_pri.depth = 2
+       |               THEN c_pri.cat_name
+       |           WHEN c_ga.depth = 2
+       |               THEN c_ga.cat_name
+       |           END AS second_class,
+       |       g.goods_id,
+       |       vg.virtual_goods_id,
+       |       brand_id
+       |FROM goods g
+       |         INNER JOIN virtual_goods vg USING (goods_id)
+       |         LEFT JOIN category c ON g.cat_id = c.cat_id
+       |         LEFT JOIN category c_pri ON c.parent_id = c_pri.cat_id
+       |         LEFT JOIN category c_ga ON c_pri.parent_id = c_ga.cat_id
+     """.stripMargin
+    }
+
     val reportDb = new DataSource("themis_report_read")
-    reportDb.load(spark, sql)
+    reportDb.load(spark, getPayedInfo)
       .write
       .mode(SaveMode.Overwrite)
       .parquet("s3://vomkt-emr-rec/testresult/first_order_info/")
+    val themisDb = new DataSource("themis_read")
+    themisDb.load(spark, getGoodsBrand)
+      .write
+      .mode(SaveMode.Overwrite)
+      .parquet("s3://vomkt-emr-rec/testresult/goods/")
   }
 
   def main(args: Array[String]): Unit = {
