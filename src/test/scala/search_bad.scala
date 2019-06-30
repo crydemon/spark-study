@@ -1,12 +1,10 @@
 
 import java.io.File
-import java.sql.Struct
 import java.util.Base64
 
 import org.apache.commons.io.FileUtils
 import org.apache.spark.sql.{DataFrame, SaveMode, SparkSession, functions}
 
-import scala.util.matching.Regex
 
 case class badEvent(error: Seq[String], info: String)
 
@@ -20,9 +18,7 @@ object search_bad {
     spark.sparkContext.setLogLevel("WARN")
     import spark.implicits._
 
-    val data = spark.read.json("E:\\eks\\vomkt-evt\\enrich-bad\\2019\\06\\21\\18")
-
-    data.printSchema()
+    val data = spark.read.json("E:\\eks\\vomkt-evt\\enrich-bad\\2019\\06\\28\\21")
 
     def writeToCSV(data: DataFrame): Unit = {
       val savePath = "d:/result"

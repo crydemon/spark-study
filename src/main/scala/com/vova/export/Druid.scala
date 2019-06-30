@@ -105,7 +105,7 @@ object DruidSQL {
     val startTime = "2019-06-09 00:00:00"
     val endTime = "2019-06-11 00:00:00"
     Druid.loadData(Druid.query(fromGoodsCtrV2(startTime, endTime, "")), spark)
-        .show()
+      .show()
   }
 
 
@@ -331,68 +331,82 @@ object DruidSQL {
     import spark.implicits._
     spark.read
       .option("header", "true")
-      .csv("d:/order_goods.csv")
-      .createOrReplaceTempView("order_goods")
-    spark.read
-      .option("header", "true")
-      .csv("d:/app_version.csv")
-      .createOrReplaceTempView("versions")
-    val ordered = spark.sqlContext.sql(
+      .csv("d:/flash_sale.csv")
+      .filter($"os_family".isin("Android", "iOS"))
+      .withColumn("device_id", functions.when($"device_id" === "null", $"idfv").otherwise($"device_id"))
+      .createOrReplaceTempView("flash_sale")
+
+    spark.sqlContext.sql(
       """
         |select
-        | date(order_time) as cur_day,
-        | count(1) as order_num,
-        | count(distinct user_id) as order_user
-        |from order_goods og
-        | inner join versions v using(order_id)
-        |where app_version = '2.32.0'
-        | and hour(pay_time) * 60 + minute(pay_time) >= 12 * 60 + 15
-        |group by date(order_time)
+        | *
+        |from flash_sale
       """.stripMargin)
+      .show(false)
 
-    val payed = spark.sqlContext.sql(
+    val cur_day = spark.sqlContext.sql(
       """
-        |select
-        | date(pay_time) as cur_day,
-        | count(1) as pay_num,
-        | count(distinct user_id) as pay_user,
-        | sum(goods_gmv) as gmv
-        |from order_goods og
-        | inner join versions v using(order_id)
-        |where pay_status >= 1
-        | and app_version = '2.32.0'
-        | and hour(pay_time) * 60 + minute(pay_time) >= 12 * 60 + 15
-        |group by date(pay_time)
+        | select
+        |   to_date(event_date) as cur_day,
+        |   os_family,
+        |   count(distinct device_id) as total_uv
+        | from flash_sale
+        | group by to_date(event_date), os_family
       """.stripMargin)
+      .cache()
 
-    val app_versions = spark.sqlContext.sql(
+
+    val data3 = spark.sqlContext.sql(
       """
-        |select
-        | date(pay_time) as cur_day,
-        | app_version,
-        | count(1) as pay_num,
-        | count(distinct user_id) as pay_user,
-        | sum(goods_gmv) as gmv
-        |from order_goods og
-        | inner join versions v using(order_id)
-        |where pay_status >= 1
-        | and hour(pay_time) * 60 + minute(pay_time) >= 12 * 60 + 15
-        |group by date(pay_time), app_version
+        | select
+        |   to_date(event_date) as cur_day,
+        |   os_family,
+        |   if(device_id != 'null', 'total_has_device_id', 'total_no_device_id') as has_device_id,
+        |   count(distinct device_id) as total_uv
+        | from flash_sale
+        | group by to_date(event_date), os_family, has_device_id
       """.stripMargin)
-    writeToCSV(app_versions)
+      .cache()
 
-//
-//    val startTime = "2019-06-18 00:00:00"
-//    val endTime = "2019-06-25 00:00:00"
-//    var where = "  and page_code  = 'flashsale' and app_version = '2.32.0' and event_name = 'screen_view'  "
-//    val impressions = Druid
-//      .loadData(Druid.query(fromHit(startTime, endTime, where)), spark)
-//      .withColumn("cur_day", $"cur_day".substr(0, 10))
-//
-//    val data = ordered
-//      .join(payed, "cur_day")
-//      .join(impressions, Seq("cur_day"), "left")
-//    writeToCSV(data)
+    data3.show(false)
+
+    writeToCSV(data3)
+    cur_day.show(false)
+
+    val data1 = spark.sqlContext.sql(
+      """
+        | select
+        |   to_date(fs.event_date) as cur_day,
+        |   fs.os_family,
+        |   count(distinct fs.device_id) as has_device_id_uv
+        | from flash_sale fs
+        |   inner join flash_sale fs1 using(device_id)
+        | where datediff( to_date(fs1.event_date), to_date(fs.event_date)) = 1
+        |   and fs.device_id is not null
+        | group by to_date(fs.event_date), fs.os_family
+      """.stripMargin)
+
+    //    val data2 = spark.sqlContext.sql(
+    //      """
+    //        | select
+    //        |   to_date(fs.event_date) as cur_day,
+    //        |   fs.os_family,
+    //        |   count(distinct fs.device_id) as no_device_id_uv
+    //        | from flash_sale fs
+    //        |   left join flash_sale fs1 on fs.device_id = fs1.device_id and datediff(to_date(fs1.event_date), to_date(fs.event_date)) = 1
+    //        | where  fs1.device_id is null
+    //        |
+    //        | group by to_date(fs.event_date), fs.os_family
+    //      """.stripMargin)
+
+    val data = cur_day.join(data1, Seq("cur_day", "os_family"), "left")
+      //.join(data2,  Seq("cur_day", "os_family"))
+      .cache()
+
+    data.show()
+
+
+
   }
 
   def writeToCSV(data: DataFrame): Unit = {
@@ -420,7 +434,7 @@ object DruidSQL {
       .getOrCreate()
     spark.sparkContext.setLogLevel("WARN")
     import spark.implicits._
-    d_1334(spark)
+    d_1467(spark)
     //merge(spark)
     spark.close()
 

@@ -51,15 +51,15 @@ object BrandReport {
 
 
     val appName = "brand_report"
-    //    val spark = SparkSession.builder
-    //      .appName(appName)
-    //      .master("local[4]")
-    //      .config("spark.executor.cores", 2)
-    //      .config("spark.sql.shuffle.partitions", 30)
-    //      .config("spark.default.parallelism", 18)
-    //      .config("spark.sql.session.timeZone", "UTC")
-    //      .getOrCreate()
-    //    spark.sparkContext.setLogLevel("WARN")
+    //        val spark = SparkSession.builder
+    //          .appName(appName)
+    //          .master("local[4]")
+    //          .config("spark.executor.cores", 2)
+    //          .config("spark.sql.shuffle.partitions", 30)
+    //          .config("spark.default.parallelism", 18)
+    //          .config("spark.sql.session.timeZone", "UTC")
+    //          .getOrCreate()
+    //        spark.sparkContext.setLogLevel("WARN")
 
 
     val spark = SparkSession.builder
@@ -69,14 +69,19 @@ object BrandReport {
       .config("spark.yarn.maxAppAttempts", 1)
       .config("spark.sql.session.timeZone", "UTC")
       .getOrCreate()
-
-
     spark.sparkContext.setLogLevel("WARN")
     spark.sparkContext.setCheckpointDir("s3://vomkt-emr-rec/checkpoint/")
 
     import spark.implicits._
     val dateFormat = DateTimeFormatter.ofPattern("yyyy/MM/dd")
     var (start, end) = (LocalDate.parse(args(0), dateFormat), LocalDate.parse(args(1), dateFormat))
+
+    val goodsInfo = spark.read
+      .parquet("s3://vomkt-emr-rec/testresult/goods/")
+      //.parquet("d:/goods/")
+      .select("virtual_goods_id", "first_class", "brand_id")
+      .cache()
+
     while (start.compareTo(end) <= 0) {
       val next = start.plusDays(1)
       val startS = start.format(dateFormat)
@@ -84,34 +89,35 @@ object BrandReport {
       //原数据
       val ctr = spark.read
         .json("s3://vomkt-evt/batch-processed/goods_ctr_v2/" + startS + "T*")
+        //.json("d:/vomkt-evt/batch-processed/goods_ctr_v2/" + startS)
         .filter($"os_type".isin("android", "ios"))
-        .select("goods_id", "derived_ts", "clicks", "impressions", "country", "os_type")
+        .select("goods_id", "derived_ts", "clicks", "impressions", "country", "os_type", "domain_userid")
         .withColumnRenamed("country", "region_code")
         .withColumnRenamed("os_type", "platform")
         .cache()
+
       val hit = spark.read
         .json("s3://vomkt-evt/batch-processed/hit/" + startS + "T*")
-        .filter(F.lower($"os_family").isin("android", "ios"))
-        .select("element_id", "domain_userid", "event_name", "element_name", "derived_ts", "os_family", "country", "page_code")
+        //.json("d:/vomkt-evt/batch-processed/hit/" + startS)
+        .withColumn("os_family", F.lower($"os_family"))
+        .filter($"os_family".isin("android", "ios"))
+        .select("element_id", "domain_userid", "event_name", "element_name", "derived_ts", "os_family", "country", "page_code", "url")
         .withColumnRenamed("country", "region_code")
         .withColumnRenamed("os_family", "platform")
         .cache()
-      val goodsInfo = spark.read
-        .parquet("s3://vomkt-emr-rec/testresult/goods/")
-        .select("virtual_goods_id", "first_class", "brand_id")
-        .cache()
-
-
+      //组合每种情况
       for {
         platform <- List(F.col("platform"), F.lit("all"))
         regionCode <- List(F.col("region_code"), F.lit("all"))
-        brand <- List(F.when($"brand_id" > 0, "Y").otherwise("N"), F.lit("all"))
+        brand <- List(F.when($"brand_id" > 0, "Y").when($"brand_id" === 0, "N").otherwise("Unknown"), F.lit("all"))
         firstClass <- List(F.col("first_class"), F.lit("all"))
       } {
         //商详页
         val productDetail = hit
           .filter($"page_code" === "product_detail")
-          .filter($"event_name" === "common_click")
+          .filter($"event_name" === "screen_view")
+          .withColumn("goods_id", F.regexp_extract($"url", "goods_id=([0-9]+)", 1))
+
         //加购成功
         val cartSuccess = hit
           .filter($"element_name" === "pdAddToCartSuccess")
@@ -122,7 +128,7 @@ object BrandReport {
           .filter($"event_name" === "common_click")
           .filter($"element_name" === "pdAddToCartClick")
 
-
+        //ctr事件
         val ctr1 = ctr
           .join(goodsInfo, $"goods_id" === $"virtual_goods_id", "left")
           .withColumn("cur_day", F.to_date($"derived_ts"))
@@ -132,13 +138,15 @@ object BrandReport {
           .withColumn("platform", platform)
           .groupBy("cur_day", "is_brand", "first_class", "region_code", "platform")
           .agg(
-            F.sum("clicks").alias("sum_clicks"),
-            F.sum("impressions").alias("sum_impressions")
+            F.sum("impressions").alias("sum_impressions"),
+            F.sum("clicks").alias("sum_clicks")
           )
           .cache()
 
+
+        //商详页
         val productDetail1 = productDetail
-          .join(goodsInfo, $"element_id" === $"virtual_goods_id", "left")
+          .join(goodsInfo, $"goods_id" === $"virtual_goods_id", "left")
           .withColumn("cur_day", F.to_date($"derived_ts"))
           .withColumn("is_brand", brand)
           .withColumn("first_class", firstClass)
@@ -150,7 +158,7 @@ object BrandReport {
           )
           .cache()
 
-
+        //加购成功
         val cartSuccess1 = cartSuccess
           .join(goodsInfo, $"element_id" === $"virtual_goods_id", "left")
           .withColumn("cur_day", F.to_date($"derived_ts"))
@@ -163,8 +171,7 @@ object BrandReport {
             F.approx_count_distinct("domain_userid").alias("cart_success")
           )
           .cache()
-
-
+        //加购
         val cart1 = cart
           .join(goodsInfo, $"element_id" === $"virtual_goods_id", "left")
           .withColumn("cur_day", F.to_date($"derived_ts"))
@@ -177,11 +184,10 @@ object BrandReport {
             F.approx_count_distinct("domain_userid").alias("cart")
           )
           .cache()
-
-
+        //求gmv
         val gmv =
           s"""
-             |SELECT date(oi.pay_time)                           AS cur_day,
+             |SELECT date(oi.pay_time)                      AS cur_day,
              |       r.region_code,
              |       CASE
              |           WHEN c.depth = 1
@@ -190,16 +196,15 @@ object BrandReport {
              |               THEN c_pri.cat_name
              |           WHEN c_ga.depth = 1
              |               THEN c_ga.cat_name
-             |           END                                     AS first_class,
-             |       if(g.brand_id > 0, 'Y', 'N')                AS is_brand,
+             |           END                                AS first_class,
+             |       brand_id,
              |       CASE
              |           WHEN ore.device_type = 11 THEN 'ios'
              |           WHEN ore.device_type = 12 THEN 'android'
-             |           END
-             |                                                   AS platform,
-             |       count(DISTINCT oi.user_id)                  AS pay_user,
-             |       count(DISTINCT oi.order_id)                 AS pay_num,
-             |       sum(og.shipping_fee + og.shop_price_amount) AS gmv
+             |           END                                AS platform,
+             |       oi.user_id                             AS pay_user,
+             |       oi.order_id                            AS pay_num,
+             |       og.shipping_fee + og.shop_price_amount AS gmv
              |FROM order_info oi
              |         INNER JOIN region r ON r.region_id = oi.country
              |         INNER JOIN order_relation ore USING (order_id)
@@ -210,11 +215,11 @@ object BrandReport {
              |         LEFT JOIN category c_ga ON c_pri.parent_id = c_ga.cat_id
              |WHERE oi.pay_time >= '$startS'
              |  AND oi.pay_time < '$endS'
+             |  AND oi.parent_order_id = 0
              |  AND oi.pay_status >= 1
-             |  AND oi.from_domain like 'api%'
+             |  AND oi.from_domain LIKE 'api%'
              |  AND ore.device_type IN (11, 12)
-             |GROUP BY cur_day, first_class, is_brand, platform, region_code
-        """.stripMargin
+          """.stripMargin
 
         val gmvDf = themisDb
           .load(spark, gmv)
@@ -224,13 +229,12 @@ object BrandReport {
           .withColumn("platform", platform)
           .groupBy("cur_day", "is_brand", "first_class", "region_code", "platform")
           .agg(
-            F.sum("pay_user").alias("pay_user"),
-            F.sum("gmv").alias("gmv"),
-            F.sum("pay_num").alias("pay_num")
+            F.approx_count_distinct("pay_user").alias("pay_user"),
+            F.approx_count_distinct("pay_num").alias("pay_num"),
+            F.sum("gmv").alias("gmv")
           )
           .cache()
-
-
+        //求dau
         val dau =
           s"""
              |SELECT tcdcd.action_date AS cur_day,
@@ -260,9 +264,25 @@ object BrandReport {
           .join(cart1, Seq("cur_day", "first_class", "is_brand", "platform", "region_code"), "left")
           .join(productDetail1, Seq("cur_day", "first_class", "is_brand", "platform", "region_code"), "left")
           .join(cartSuccess1, Seq("cur_day", "first_class", "is_brand", "platform", "region_code"), "left")
+          .select(
+            F.coalesce($"cur_day", F.lit("0000-00-00")).alias("cur_day"),
+            F.coalesce($"first_class", F.lit("")).alias("first_class"),
+            F.coalesce($"is_brand", F.lit("")).alias("is_brand"),
+            F.coalesce($"platform", F.lit("")).alias("platform"),
+            F.coalesce($"region_code", F.lit("")).alias("region_code"),
+            F.coalesce($"dau", F.lit(0)).alias("dau"),
+            F.coalesce($"pay_user", F.lit(0)).alias("pay_user"),
+            F.coalesce($"pay_num", F.lit(0)).alias("pay_num"),
+            F.coalesce($"gmv", F.lit(0.00)).alias("gmv"),
+            F.coalesce($"sum_impressions", F.lit(0)).alias("sum_impressions"),
+            F.coalesce($"sum_clicks", F.lit(0)).alias("sum_clicks"),
+            F.coalesce($"product_detail", F.lit(0)).alias("product_detail"),
+            F.coalesce($"cart", F.lit(0)).alias("cart"),
+            F.coalesce($"cart_success", F.lit(0)).alias("cart_success")
+          )
           .cache()
 
-        data.show(false)
+        //data.show(false)
         reportDb.insertPure("brand_report", data, spark)
       }
       start = next
