@@ -51,14 +51,13 @@ object DruidSQL {
       s"""
          |SELECT
          | floor(__time to day) AS cur_day,
-         | count(DISTINCT domain_userid) AS uv,
-         | count(1)  AS pv
+         | device_id,
+         | idfv
          |FROM hit
          |WHERE  __time >= TIMESTAMP '$startTime'
          |    AND __time < TIMESTAMP '$endTime'
-         |     and TIMESTAMP_TO_MILLIS(__time) / 1000 / 60 >= 12 * 60 + 15
          |    $where
-         |group by floor(__time to day)
+         |group by floor(__time to day), device_id, idfv
         """.stripMargin
     println(sql)
     sql
@@ -329,84 +328,187 @@ object DruidSQL {
 
   def d_1467(spark: SparkSession): Unit = {
     import spark.implicits._
-    spark.read
+    val rawData = spark.read
       .option("header", "true")
       .csv("d:/flash_sale.csv")
       .filter($"os_family".isin("Android", "iOS"))
-      .withColumn("device_id", functions.when($"device_id" === "null", $"idfv").otherwise($"device_id"))
-      .createOrReplaceTempView("flash_sale")
+      .filter($"os_family" === "iOS")
+      .withColumn("event_date", functions.to_date($"event_date"))
+      .withColumn("device_id", $"idfv")
 
-    spark.sqlContext.sql(
+
+    val android = rawData
+
+    val androidNext = rawData
+      .withColumn("next_date", functions.date_sub($"event_date", 1))
+
+    val androidCurDay = android
+      .groupBy("event_date")
+      .agg(
+        functions.countDistinct("device_id").alias("cur_has_device")
+      )
+
+    val androidNextDay = android
+      .join(androidNext, android("event_date") === androidNext("next_date") and (android("device_id") === androidNext("device_id")))
+      .groupBy(android("event_date"))
+      .agg(
+        functions.countDistinct(android("device_id")).alias("next_has_device")
+      )
+
+    val androidNextDau = android
+      .groupBy("event_date")
+      .agg(
+        functions.countDistinct("domain_userid").alias("next_dau")
+      )
+      .withColumn("next_day", functions.date_sub($"event_date", 1))
+      .select("next_day", "next_dau")
+
+    val data2 = androidCurDay
+      .join(androidNextDay, Seq("event_date"), "left")
+      .join(androidNextDau, androidCurDay("event_date") === androidNextDau("next_day"), "left")
+      .withColumn("next_no_device", $"next_dau" - $"next_has_device")
+      .select("event_date", "cur_has_device", "next_has_device", "next_no_device")
+      .orderBy("event_date")
+      .cache()
+
+    writeToCSV(data2)
+
+
+  }
+
+  def d_1414(spark: SparkSession) = {
+    import spark.implicits._
+    val themisDb = new DataSource("themis_read")
+    val reportDb = new DataSource("themis_report_read")
+    val paySql =
       """
-        |select
-        | *
-        |from flash_sale
-      """.stripMargin)
+        |SELECT date(oi.pay_time)                           AS cur_day,
+        |
+        |       if(brand_id > 0, 'Y', 'N')                  AS is_brand,
+        |       count(DISTINCT oi.user_id)                  AS pay_user,
+        |       count(DISTINCT oi.order_id)                 AS pay_num,
+        |       sum(og.shipping_fee + og.shop_price_amount) AS gmv
+        |FROM order_info oi
+        |         INNER JOIN region r ON r.region_id = oi.country
+        |         INNER JOIN order_relation ore USING (order_id)
+        |         INNER JOIN order_goods og USING (order_id)
+        |         INNER JOIN goods g USING (goods_id)
+        |         LEFT JOIN category c ON g.cat_id = c.cat_id
+        |         LEFT JOIN category c_pri ON c.parent_id = c_pri.cat_id
+        |         LEFT JOIN category c_ga ON c_pri.parent_id = c_ga.cat_id
+        |WHERE oi.pay_time >= '2019-06-27'
+        |  AND oi.parent_order_id = 0
+        |  AND oi.pay_status >= 1
+        |  AND oi.from_domain LIKE 'api%'
+        |  AND ore.device_type IN (11, 12)
+        |GROUP BY cur_day, is_brand
+      """.stripMargin
+
+    val payDf = themisDb.load(spark, paySql)
+
+
+    val payAllSql =
+      """
+        |SELECT date(oi.pay_time)                           AS cur_day,
+        |
+        |       'all'                  AS is_brand,
+        |       count(DISTINCT oi.user_id)                  AS pay_user,
+        |       count(DISTINCT oi.order_id)                 AS pay_num,
+        |       sum(og.shipping_fee + og.shop_price_amount) AS gmv
+        |FROM order_info oi
+        |         INNER JOIN region r ON r.region_id = oi.country
+        |         INNER JOIN order_relation ore USING (order_id)
+        |         INNER JOIN order_goods og USING (order_id)
+        |         INNER JOIN goods g USING (goods_id)
+        |         LEFT JOIN category c ON g.cat_id = c.cat_id
+        |         LEFT JOIN category c_pri ON c.parent_id = c_pri.cat_id
+        |         LEFT JOIN category c_ga ON c_pri.parent_id = c_ga.cat_id
+        |WHERE oi.pay_time >= '2019-06-27'
+        |  AND oi.parent_order_id = 0
+        |  AND oi.pay_status >= 1
+        |  AND oi.from_domain LIKE 'api%'
+        |  AND ore.device_type IN (11, 12)
+        |GROUP BY cur_day, is_brand
+      """.stripMargin
+
+    val payAllDf = themisDb.load(spark, payAllSql)
+
+    val orderSql =
+      """
+        |SELECT date(oi.order_time)                           AS cur_day,
+        |       if(brand_id > 0, 'Y', 'N')                  AS is_brand,
+        |       count(DISTINCT oi.user_id)                  AS order_user,
+        |       count(DISTINCT oi.order_id)                 AS order_num
+        |FROM order_info oi
+        |         INNER JOIN region r ON r.region_id = oi.country
+        |         INNER JOIN order_relation ore USING (order_id)
+        |         INNER JOIN order_goods og USING (order_id)
+        |         INNER JOIN goods g USING (goods_id)
+        |         LEFT JOIN category c ON g.cat_id = c.cat_id
+        |         LEFT JOIN category c_pri ON c.parent_id = c_pri.cat_id
+        |         LEFT JOIN category c_ga ON c_pri.parent_id = c_ga.cat_id
+        |WHERE oi.order_time >= '2019-06-27'
+        |  AND oi.parent_order_id = 0
+        |  AND oi.from_domain LIKE 'api%'
+        |  AND ore.device_type IN (11, 12)
+        |GROUP BY cur_day, is_brand
+      """.stripMargin
+
+    val orderDf = themisDb.load(spark, orderSql)
+
+    val orderAllSql =
+      """
+        |SELECT date(oi.order_time)                           AS cur_day,
+        |       'all'                  AS is_brand,
+        |       count(DISTINCT oi.user_id)                  AS order_user,
+        |       count(DISTINCT oi.order_id)                 AS order_num
+        |FROM order_info oi
+        |         INNER JOIN region r ON r.region_id = oi.country
+        |         INNER JOIN order_relation ore USING (order_id)
+        |         INNER JOIN order_goods og USING (order_id)
+        |         INNER JOIN goods g USING (goods_id)
+        |         LEFT JOIN category c ON g.cat_id = c.cat_id
+        |         LEFT JOIN category c_pri ON c.parent_id = c_pri.cat_id
+        |         LEFT JOIN category c_ga ON c_pri.parent_id = c_ga.cat_id
+        |WHERE oi.order_time >= '2019-06-27'
+        |  AND oi.parent_order_id = 0
+        |  AND oi.from_domain LIKE 'api%'
+        |  AND ore.device_type IN (11, 12)
+        |GROUP BY cur_day, is_brand
+      """.stripMargin
+
+    val orderAllDf = themisDb.load(spark, orderAllSql)
+
+    val dau =
+      s"""
+         |SELECT tcdcd.action_date AS cur_day,
+         |       count(1)          AS dau
+         |FROM temp_country_device_cohort_details tcdcd
+         |WHERE tcdcd.action_date >= '2019-06-27'
+         |GROUP BY cur_day
+        """.stripMargin
+    val dauDf = reportDb
+      .load(spark, dau)
+
+    payDf
+      .join(orderDf, Seq("cur_day", "is_brand"))
+      .join(dauDf, "cur_day")
+      .withColumn("user_pay_success_rate", functions.concat(functions.round($"pay_user" * 100.0 / $"order_user", 2), functions.lit("%")))
+      .withColumn("order_pay_success_rate", functions.concat(functions.round($"pay_num" * 100.0 / $"order_num", 2), functions.lit("%")))
+      .withColumn("order_rate", functions.concat(functions.round($"order_user" * 100.0 / $"dau", 2), functions.lit("%")))
+      .withColumn("pay_rate", functions.concat(functions.round($"pay_user" * 100.0 / $"dau", 2), functions.lit("%")))
+      .orderBy("cur_day")
       .show(false)
 
-    val cur_day = spark.sqlContext.sql(
-      """
-        | select
-        |   to_date(event_date) as cur_day,
-        |   os_family,
-        |   count(distinct device_id) as total_uv
-        | from flash_sale
-        | group by to_date(event_date), os_family
-      """.stripMargin)
-      .cache()
-
-
-    val data3 = spark.sqlContext.sql(
-      """
-        | select
-        |   to_date(event_date) as cur_day,
-        |   os_family,
-        |   if(device_id != 'null', 'total_has_device_id', 'total_no_device_id') as has_device_id,
-        |   count(distinct device_id) as total_uv
-        | from flash_sale
-        | group by to_date(event_date), os_family, has_device_id
-      """.stripMargin)
-      .cache()
-
-    data3.show(false)
-
-    writeToCSV(data3)
-    cur_day.show(false)
-
-    val data1 = spark.sqlContext.sql(
-      """
-        | select
-        |   to_date(fs.event_date) as cur_day,
-        |   fs.os_family,
-        |   count(distinct fs.device_id) as has_device_id_uv
-        | from flash_sale fs
-        |   inner join flash_sale fs1 using(device_id)
-        | where datediff( to_date(fs1.event_date), to_date(fs.event_date)) = 1
-        |   and fs.device_id is not null
-        | group by to_date(fs.event_date), fs.os_family
-      """.stripMargin)
-
-    //    val data2 = spark.sqlContext.sql(
-    //      """
-    //        | select
-    //        |   to_date(fs.event_date) as cur_day,
-    //        |   fs.os_family,
-    //        |   count(distinct fs.device_id) as no_device_id_uv
-    //        | from flash_sale fs
-    //        |   left join flash_sale fs1 on fs.device_id = fs1.device_id and datediff(to_date(fs1.event_date), to_date(fs.event_date)) = 1
-    //        | where  fs1.device_id is null
-    //        |
-    //        | group by to_date(fs.event_date), fs.os_family
-    //      """.stripMargin)
-
-    val data = cur_day.join(data1, Seq("cur_day", "os_family"), "left")
-      //.join(data2,  Seq("cur_day", "os_family"))
-      .cache()
-
-    data.show()
-
-
-
+    payAllDf
+      .join(orderAllDf, Seq("cur_day", "is_brand"))
+      .join(dauDf, "cur_day")
+      .withColumn("user_pay_success_rate", functions.concat(functions.round($"pay_user" * 100.0 / $"order_user", 2), functions.lit("%")))
+      .withColumn("order_pay_success_rate", functions.concat(functions.round($"pay_num" * 100.0 / $"order_num", 2), functions.lit("%")))
+      .withColumn("order_rate", functions.concat(functions.round($"order_user" * 100.0 / $"dau", 2), functions.lit("%")))
+      .withColumn("pay_rate", functions.concat(functions.round($"pay_user" * 100.0 / $"dau", 2), functions.lit("%")))
+      .orderBy("cur_day")
+      .show(false)
   }
 
   def writeToCSV(data: DataFrame): Unit = {

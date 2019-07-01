@@ -4,10 +4,10 @@ import java.time.LocalDate
 import java.time.format.DateTimeFormatter
 
 import com.vova.db.DataSource
+import org.apache.spark.sql.{SaveMode, SparkSession}
 import org.apache.spark.sql.{DataFrame, Dataset, SaveMode, SparkSession, functions => F}
 
-object BrandReport {
-
+object ActivityReport {
   def createTable: String =
     """
       |CREATE TABLE `brand_report`
@@ -51,6 +51,16 @@ object BrandReport {
 
 
     val appName = "brand_report"
+    //        val spark = SparkSession.builder
+    //          .appName(appName)
+    //          .master("local[4]")
+    //          .config("spark.executor.cores", 2)
+    //          .config("spark.sql.shuffle.partitions", 30)
+    //          .config("spark.default.parallelism", 18)
+    //          .config("spark.sql.session.timeZone", "UTC")
+    //          .getOrCreate()
+    //        spark.sparkContext.setLogLevel("WARN")
+
 
     val spark = SparkSession.builder
       .master("yarn")
