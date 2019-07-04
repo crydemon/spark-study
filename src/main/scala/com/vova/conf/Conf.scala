@@ -9,7 +9,8 @@ object Conf {
     case "local" => ConfigFactory.load("local.conf")
     case _ => ConfigFactory.load("prod.conf")
   }
-  private val conf: Config = ConfigFactory.systemEnvironment()
+  private val conf: Config = ConfigFactory
+    .systemEnvironment()
     .withFallback(configure)
 
   def getString(path: String): String = {

@@ -17,6 +17,9 @@ object CauseAnaliticEventType {
   val goods_click = 0
   val place_order = 1
   val add_to_cart = 2
+  val ordered = 3
+  val payed = 4
+  val refund = 5
 }
 
 case class CauseAnaliticEvent(
@@ -240,6 +243,7 @@ object Main {
     val inFmt = DateTimeFormatter.ofPattern("yyyy/MM/dd/HH")
     val (start, end) = (LocalDateTime.parse(args(0), inFmt), LocalDateTime.parse(args(1), inFmt))
     run(spark, start, end)
+
 
     spark.stop()
   }

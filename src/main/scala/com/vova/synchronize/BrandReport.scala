@@ -95,6 +95,63 @@ object BrandReport {
         .withColumnRenamed("country", "region_code")
         .withColumnRenamed("os_family", "platform")
         .cache()
+
+      val gmv =
+        s"""
+           |SELECT date(oi.pay_time)                      AS cur_day,
+           |       r.region_code,
+           |       CASE
+           |           WHEN c.depth = 1
+           |               THEN c.cat_name
+           |           WHEN c_pri.depth = 1
+           |               THEN c_pri.cat_name
+           |           WHEN c_ga.depth = 1
+           |               THEN c_ga.cat_name
+           |           END                                AS first_class,
+           |       brand_id,
+           |       CASE
+           |           WHEN ore.device_type = 11 THEN 'ios'
+           |           WHEN ore.device_type = 12 THEN 'android'
+           |           END                                AS platform,
+           |       oi.user_id                             AS pay_user,
+           |       oi.order_id                            AS pay_num,
+           |       og.shipping_fee + og.shop_price_amount AS gmv
+           |FROM order_info oi
+           |         INNER JOIN region r ON r.region_id = oi.country
+           |         INNER JOIN order_relation ore USING (order_id)
+           |         INNER JOIN order_goods og USING (order_id)
+           |         INNER JOIN goods g USING (goods_id)
+           |         LEFT JOIN category c ON g.cat_id = c.cat_id
+           |         LEFT JOIN category c_pri ON c.parent_id = c_pri.cat_id
+           |         LEFT JOIN category c_ga ON c_pri.parent_id = c_ga.cat_id
+           |WHERE oi.pay_time >= '$startS'
+           |  AND oi.pay_time < '$endS'
+           |  AND oi.parent_order_id = 0
+           |  AND oi.pay_status >= 1
+           |  AND oi.from_domain LIKE 'api%'
+           |  AND ore.device_type IN (11, 12)
+          """.stripMargin
+
+      val gmvDf = themisDb
+        .load(spark, gmv)
+        .cache()
+
+      //求dau
+      val dau =
+        s"""
+           |SELECT tcdcd.action_date AS cur_day,
+           |       platform,
+           |       CASE
+           |           WHEN country = 'UK' THEN 'GB'
+           |           ELSE country
+           |           END           AS region_code,
+           |       count(1)          AS dau
+           |FROM temp_country_device_cohort_details tcdcd
+           |WHERE tcdcd.action_date = '$startS'
+           |GROUP BY cur_day, platform, region_code
+        """.stripMargin
+      val dauDf = reportDb
+        .load(spark, dau)
       //组合每种情况
       for {
         platform <- List(F.col("platform"), F.lit("all"))
@@ -175,44 +232,7 @@ object BrandReport {
           )
           .cache()
         //求gmv
-        val gmv =
-          s"""
-             |SELECT date(oi.pay_time)                      AS cur_day,
-             |       r.region_code,
-             |       CASE
-             |           WHEN c.depth = 1
-             |               THEN c.cat_name
-             |           WHEN c_pri.depth = 1
-             |               THEN c_pri.cat_name
-             |           WHEN c_ga.depth = 1
-             |               THEN c_ga.cat_name
-             |           END                                AS first_class,
-             |       brand_id,
-             |       CASE
-             |           WHEN ore.device_type = 11 THEN 'ios'
-             |           WHEN ore.device_type = 12 THEN 'android'
-             |           END                                AS platform,
-             |       oi.user_id                             AS pay_user,
-             |       oi.order_id                            AS pay_num,
-             |       og.shipping_fee + og.shop_price_amount AS gmv
-             |FROM order_info oi
-             |         INNER JOIN region r ON r.region_id = oi.country
-             |         INNER JOIN order_relation ore USING (order_id)
-             |         INNER JOIN order_goods og USING (order_id)
-             |         INNER JOIN goods g USING (goods_id)
-             |         LEFT JOIN category c ON g.cat_id = c.cat_id
-             |         LEFT JOIN category c_pri ON c.parent_id = c_pri.cat_id
-             |         LEFT JOIN category c_ga ON c_pri.parent_id = c_ga.cat_id
-             |WHERE oi.pay_time >= '$startS'
-             |  AND oi.pay_time < '$endS'
-             |  AND oi.parent_order_id = 0
-             |  AND oi.pay_status >= 1
-             |  AND oi.from_domain LIKE 'api%'
-             |  AND ore.device_type IN (11, 12)
-          """.stripMargin
-
-        val gmvDf = themisDb
-          .load(spark, gmv)
+        gmvDf
           .withColumn("is_brand", brand)
           .withColumn("first_class", firstClass)
           .withColumn("region_code", regionCode)
@@ -225,21 +245,7 @@ object BrandReport {
           )
           .cache()
         //求dau
-        val dau =
-          s"""
-             |SELECT tcdcd.action_date AS cur_day,
-             |       platform,
-             |       CASE
-             |           WHEN country = 'UK' THEN 'GB'
-             |           ELSE country
-             |           END           AS region_code,
-             |       count(1)          AS dau
-             |FROM temp_country_device_cohort_details tcdcd
-             |WHERE tcdcd.action_date = '$startS'
-             |GROUP BY cur_day, platform, region_code
-        """.stripMargin
-        val dauDf = reportDb
-          .load(spark, dau)
+        dauDf
           .withColumn("region_code", regionCode)
           .withColumn("platform", platform)
           .groupBy("cur_day", "region_code", "platform")
@@ -270,21 +276,13 @@ object BrandReport {
             F.coalesce($"cart", F.lit(0)).alias("cart"),
             F.coalesce($"cart_success", F.lit(0)).alias("cart_success")
           )
-          .write
-          .mode(SaveMode.Append)
-          .parquet("s3://vomkt-emr-rec/testresult/brand_report/")
-
+          .cache()
 
         //data.show(false)
-
+        reportDb.insertPure("brand_report", data, spark)
       }
       start = next
     }
-    val data = spark
-      .read
-      .parquet("s3://vomkt-emr-rec/testresult/brand_report/")
-    reportDb.insertPure("brand_report", data, spark)
-
 
   }
 

@@ -3,6 +3,7 @@ package com.vova.synchronize
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
 
+import com.vova.conf.Conf
 import com.vova.db.DataSource
 import org.apache.spark.sql.{SaveMode, SparkSession}
 import org.apache.spark.sql.{DataFrame, Dataset, SaveMode, SparkSession, functions => F}
@@ -82,13 +83,15 @@ object ActivityReport {
       .select("virtual_goods_id", "first_class", "brand_id")
       .cache()
 
+    val batchRoot = Conf.getString("s3.evt.batch-processed.root")
+
     while (start.compareTo(end) <= 0) {
       val next = start.plusDays(1)
       val startS = start.format(dateFormat)
       val endS = next.format(dateFormat)
       //原数据
       val ctr = spark.read
-        .json("s3://vomkt-evt/batch-processed/goods_ctr_v2/" + startS + "T*")
+        .json(batchRoot + "/goods_ctr_v2/" + startS + "T*")
         //.json("d:/vomkt-evt/batch-processed/goods_ctr_v2/" + startS)
         .filter($"os_type".isin("android", "ios"))
         .select("goods_id", "derived_ts", "clicks", "impressions", "country", "os_type", "domain_userid")

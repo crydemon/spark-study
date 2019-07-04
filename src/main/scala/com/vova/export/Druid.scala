@@ -4,13 +4,15 @@ import java.io.File
 import java.util
 
 import com.google.gson.Gson
+import com.vova.conf.Conf
 import com.vova.db.DataSource
 import org.apache.commons.io.FileUtils
 import org.apache.http.client.methods.HttpPost
 import org.apache.http.entity.StringEntity
 import org.apache.http.impl.client.DefaultHttpClient
 import org.apache.http.util.EntityUtils
-import org.apache.spark.sql.{DataFrame, SaveMode, SparkSession, functions}
+import org.apache.spark.sql.expressions.Window
+import org.apache.spark.sql.{DataFrame, SaveMode, SparkSession, functions => F}
 
 object Druid {
 
@@ -103,8 +105,202 @@ object DruidSQL {
     import spark.implicits._
     val startTime = "2019-06-09 00:00:00"
     val endTime = "2019-06-11 00:00:00"
-    Druid.loadData(Druid.query(fromGoodsCtrV2(startTime, endTime, "")), spark)
-      .show()
+    //    val luckystarFeedsGoodsC =
+    //      """
+    //        |SELECT
+    //        |   floor(__time to day) as cur_day,
+    //        |   country,
+    //        |   count(DISTINCT domain_userid) as LuckystarFeedsGoods
+    //        |FROM hit
+    //        |WHERE page_code = 'lucky_star'
+    //        |    AND element_name = 'LuckystarFeedsGoods'
+    //        |    AND event_name = 'common_click'
+    //        |    AND __time >= '2019-06-10'
+    //        |    AND country IN('FR', 'GB','DE','IT','ES','PT')
+    //        |GROUP BY floor(__time to day), country
+    //      """.stripMargin
+    //    val fgc =  Druid.loadData(Druid.query(luckystarFeedsGoodsC), spark)
+    //
+    //    val luckystarHighOddsGoodsc =
+    //      """
+    //        |SELECT
+    //        |   floor(__time to day) as cur_day,
+    //        |   country,
+    //        |   count(DISTINCT domain_userid) as LuckystarHighOddsGoods
+    //        |FROM hit
+    //        |WHERE page_code = 'lucky_star'
+    //        |    AND element_name = 'LuckystarHighOddsGoods'
+    //        |    AND event_name = 'common_click'
+    //        |    AND __time >= '2019-06-10'
+    //        |    AND country IN('FR', 'GB','DE','IT','ES','PT')
+    //        |GROUP BY floor(__time to day), country
+    //      """.stripMargin
+    //    val ogc =  Druid.loadData(Druid.query(luckystarHighOddsGoodsc), spark)
+    //
+    //    val luckystarBrandGoodsc =
+    //      """
+    //        |SELECT
+    //        |   floor(__time to day) as cur_day,
+    //        |   country,
+    //        |   count(DISTINCT domain_userid) as LuckystarBrandGoods
+    //        |FROM hit
+    //        |WHERE page_code = 'lucky_star'
+    //        |    AND element_name = 'LuckystarBrandGoods'
+    //        |    AND event_name = 'common_click'
+    //        |    AND __time >= '2019-06-10'
+    //        |    AND country IN('FR', 'GB','DE','IT','ES','PT')
+    //        |GROUP BY floor(__time to day), country
+    //      """.stripMargin
+    //    val bgc =  Druid.loadData(Druid.query(luckystarBrandGoodsc), spark)
+    //
+    //    val exposureUvc =
+    //      """
+    //        |SELECT
+    //        |   floor(__time to day) as cur_day,
+    //        |   country,
+    //        |   count(DISTINCT domain_userid) as exposure_uv
+    //        |FROM hit
+    //        |WHERE page_code = 'lucky_star'
+    //        |    AND event_name = 'page_view'
+    //        |    AND __time >= '2019-06-10'
+    //        |    AND country IN('FR', 'GB','DE','IT','ES','PT')
+    //        |GROUP BY floor(__time to day), country
+    //      """.stripMargin
+    //    val euc =  Druid.loadData(Druid.query(exposureUvc), spark)
+    //
+    //    val data = euc
+    //      .join(bgc, Seq("cur_day", "country"))
+    //      .join(ogc, Seq("cur_day", "country"))
+    //      .join(fgc, Seq("cur_day", "country"))
+    //
+    //    writeToCSV(data)
+
+
+    val oi = spark
+      .read
+      .option("header", "true")
+      .csv("d:/luckystar_winning_record.csv")
+
+    val oiUsers = oi.select("user_id")
+      .distinct()
+
+    val loi = spark
+      .read
+      .option("header", "true")
+      .csv("d:/luckystar_order_info.csv")
+
+    val loiUsers = loi.select("user_id")
+      .distinct()
+
+    val newUsers =
+      oiUsers.except(loiUsers)
+
+
+    val oldUsers = loi
+
+    val users = spark
+      .read
+      .option("header", "true")
+      .csv("d:/lucky_star_users.csv")
+
+    val newOrdered = newUsers
+      .join(loi, "user_id")
+      .withColumn("event_date", F.to_date($"create_time"))
+      .groupBy("event_date")
+      .agg(
+        F.approx_count_distinct("luckystar_order_id").alias("order_num"),
+        F.approx_count_distinct("user_id").alias("order_user")
+      )
+
+    val newPayed = newUsers
+      .join(loi, "user_id")
+      .withColumn("event_date", F.to_date($"pay_time"))
+      .groupBy("event_date")
+      .agg(
+        F.approx_count_distinct("luckystar_order_id").alias("pay_num"),
+        F.approx_count_distinct("user_id").alias("pay_user"),
+        F.sum($"order_amount" - $"bonus").alias("gmv")
+      )
+
+    val newUv = newUsers
+      .join(users, $"user_id" === $"user_unique_id")
+      .withColumn("event_date", F.to_date($"event_date"))
+      .groupBy("event_date")
+      .agg(
+        F.approx_count_distinct("user_id").alias("uv")
+      )
+
+
+    FileUtils.deleteDirectory(new File("d:/lucky_new_user/"))
+    FileUtils.deleteDirectory(new File("d:/lucky_old_user/"))
+    newUv
+      .join(newOrdered, Seq("event_date"), "left")
+      .join(newPayed, Seq("event_date"), "left")
+      .coalesce(1)
+      .write
+      .option("header", "true")
+      .mode(SaveMode.Append)
+      .csv("d:/lucky_new_user/")
+
+
+    val oldOrdered = oldUsers
+      .withColumn("event_date", F.to_date($"create_time"))
+      .groupBy("event_date")
+      .agg(
+        F.approx_count_distinct("luckystar_order_id").alias("order_num"),
+        F.approx_count_distinct("user_id").alias("order_user")
+      )
+
+    val oldPayed = oldUsers
+      .withColumn("event_date", F.to_date($"pay_time"))
+      .groupBy("event_date")
+      .agg(
+        F.approx_count_distinct("luckystar_order_id").alias("pay_num"),
+        F.approx_count_distinct("user_id").alias("pay_user"),
+        F.sum($"order_amount" - $"bonus").alias("gmv")
+      )
+
+    val oldUv = oldUsers
+      .join(users, $"luckystar_order_id" === $"user_unique_id")
+      .withColumn("event_date", F.to_date($"event_date"))
+      .groupBy("event_date")
+      .agg(
+        F.approx_count_distinct("user_id").alias("uv")
+      )
+    oldUv
+      .join(oldOrdered, Seq("event_date"), "left")
+      .join(oldPayed, Seq("event_date"), "left")
+      .coalesce(1)
+      .write
+      .option("header", "true")
+      .mode(SaveMode.Append)
+      .csv("d:/lucky_old_user/")
+
+    //    val winspec = Window
+    //      .partitionBy("user_id")
+    //      .orderBy("pay_time")
+    //
+    //    val payedLoi = loi
+    //      .filter($"pay_status" >= 1)
+    //
+    //    val data2 = payedLoi
+    //      .withColumn("first_time", F.first("pay_time", true).over(winspec))
+    //      .withColumn("diff", F.lit(F.unix_timestamp($"pay_time") / 3600 - F.unix_timestamp($"first_time") / 3600))
+    //      .withColumn("diff", F.when($"diff" < 24, "[0, 1)")
+    //        .when($"diff" < 48, "[1, 2)")
+    //        .when($"diff" < 72, "[2, 3)")
+    //        .when($"diff" < 96, "[3, 4)")
+    //        .when($"diff" < 120, "[4, 5)")
+    //        .otherwise("[5, )")
+    //      )
+    //
+    //      .withColumn("event_date", F.to_date($"pay_time"))
+    //      .groupBy("event_date", "diff")
+    //      .count()
+
+    //  writeToCSV(data2)
+
+
   }
 
 
@@ -118,11 +314,11 @@ object DruidSQL {
         |FROM app_message_push amp
         |         INNER JOIN app_event_log_message_push aelmp ON amp.id = aelmp.event_value
         |WHERE amp.push_result = 2
-        |  AND amp.event_type IN (400, 410, 411, 412, 413)
-        |  AND amp.push_time >= '2019-05-24'
+        |  AND amp.event_type IN (400, 410, 411, 412, 413, 414)
+        |  AND amp.push_time >= '2019-06-10'
         |  AND aelmp.event_type = 'click'
-        |  AND amp.push_date >= '2019-05-24'
-        |  AND aelmp.event_time >= '2019-05-24'
+        |  AND amp.push_date >= '2019-06-10'
+        |  AND aelmp.event_time >= '2019-06-10'
         |  AND aelmp.event_time >= amp.push_time
       """.stripMargin
 
@@ -133,81 +329,83 @@ object DruidSQL {
         |       amp.event_type
         |FROM app_message_push amp
         |WHERE amp.push_result = 2
-        |  AND amp.event_type IN (400, 410, 411, 412, 413)
-        |  AND amp.push_time >= '2019-05-24'
+        |  AND amp.event_type IN (400, 410, 411, 412, 413, 414)
+        |  AND amp.push_time >= '2019-06-10'
       """.stripMargin
 
     val newOrder =
       """
         |SELECT loi.order_amount AS order_gmv,
+        |       loi.order_amount - loi.bonus AS grand_total,
         |       loi.create_time  AS order_time,
         |       loi.user_id,
         |       loi.pay_status,
         |       loi.pay_time
         |FROM luckystar_order_info loi
-        |WHERE loi.create_time >= '2019-05-24'
+        |WHERE loi.create_time >= '2019-06-10'
       """.stripMargin
 
     val oldOrder =
       """
         |SELECT oi.order_amount AS order_gmv,
+        |       oi.goods_amount + oi.shipping_fee AS grand_total,
         |       oi.order_time,
         |       oi.user_id,
         |       oi.pay_status,
         |       oi.pay_time
         |FROM order_info oi
-        |WHERE oi.order_time >= '2019-05-24'
+        |WHERE oi.order_time >= '2019-06-10'
         | and  exists(select * from order_extension oe where oe.order_id = oi.order_id and oe.ext_name = 'luckystar_activity_id')
       """.stripMargin
 
-    //        val reportDb = new DataSource("themis_report_read")
-    //        reportDb
-    //          .load(spark, clickPush)
-    //          .write
-    //          .option("header", "true")
-    //          .mode(SaveMode.Append)
-    //          .csv("d:/click_push_csv/")
+    val reportDb = new DataSource("themis_report_read")
+    //    reportDb
+    //      .load(spark, clickPush)
+    //      .write
+    //      .option("header", "true")
+    //      .mode(SaveMode.Append)
+    //      .csv("d:/click_push_csv/")
     //
-    //        reportDb.load(spark, tryPush)
-    //          .write
-    //          .option("header", "true")
-    //          .mode(SaveMode.Append)
-    //          .csv("d:/try_push_csv/")
-    //
-    //        val themisDb = new DataSource("themis_read")
-    //        themisDb.load(spark, newOrder)
-    //          .write
-    //          .option("header", "true")
-    //          .mode(SaveMode.Append)
-    //          .csv("d:/order_info_csv/")
-    //
-    //        themisDb.load(spark, oldOrder)
-    //          .write
-    //          .option("header", "true")
-    //          .mode(SaveMode.Append)
-    //          .csv("d:/order_info_csv/")
+    //    reportDb.load(spark, tryPush)
+    //      .write
+    //      .option("header", "true")
+    //      .mode(SaveMode.Append)
+    //      .csv("d:/try_push_csv/")
+
+    val themisDb = new DataSource("themis_read")
+    themisDb.load(spark, newOrder)
+      .write
+      .option("header", "true")
+      .mode(SaveMode.Append)
+      .csv("d:/order_info_csv/")
+
+    themisDb.load(spark, oldOrder)
+      .write
+      .option("header", "true")
+      .mode(SaveMode.Append)
+      .csv("d:/order_info_csv/")
 
     import spark.implicits._
 
     spark.read
       .option("header", "true")
       .csv("D:\\click_push_csv\\")
-      .withColumn("push_time", functions.regexp_replace($"push_time".substr(0, 19), "T", " "))
-      .withColumn("event_time", functions.regexp_replace($"event_time".substr(0, 19), "T", " "))
+      .withColumn("push_time", F.regexp_replace($"push_time".substr(0, 19), "T", " "))
+      .withColumn("event_time", F.regexp_replace($"event_time".substr(0, 19), "T", " "))
       .createOrReplaceTempView("click_push")
 
     spark.read
       .option("header", "true")
       .csv("d:/try_push_csv/")
-      .withColumn("push_time", functions.regexp_replace($"push_time".substr(0, 19), "T", " "))
+      .withColumn("push_time", F.regexp_replace($"push_time".substr(0, 19), "T", " "))
       .createOrReplaceTempView("try_push")
 
 
     spark.read
       .option("header", "true")
       .csv("D:\\order_info_csv")
-      .withColumn("order_time", functions.regexp_replace($"order_time".substr(0, 19), "T", " "))
-      .withColumn("pay_time", functions.regexp_replace($"pay_time".substr(0, 19), "T", " "))
+      .withColumn("order_time", F.regexp_replace($"order_time".substr(0, 19), "T", " "))
+      .withColumn("pay_time", F.regexp_replace($"pay_time".substr(0, 19), "T", " "))
       .createOrReplaceTempView("order_info")
 
 
@@ -232,7 +430,8 @@ object DruidSQL {
         | date(push_time) as push_date,
         | event_type,
         | count(distinct user_id) as try_pay_user,
-        | sum(order_gmv) as try_pay_gmv
+        | sum(order_gmv) as try_pay_gmv,
+        | sum(grand_total) as try_grand_total
         |from (select first(push_time) as push_time, event_type, user_id from try_push group by date(push_time), event_type, user_id) tp
         | inner join order_info oi using(user_id)
         |where
@@ -271,7 +470,8 @@ object DruidSQL {
         | date(push_time) as push_date,
         | event_type,
         | count(distinct user_id) as click_pay_user,
-        | sum(order_gmv) as click_pay_gmv
+        | sum(order_gmv) as click_pay_gmv,
+        | sum(grand_total) as click_grand_total
         |from
         | (select
         |   first(push_time) as push_time, first(event_time) as event_time, event_type, user_id
@@ -326,190 +526,6 @@ object DruidSQL {
       """.stripMargin)
   }
 
-  def d_1467(spark: SparkSession): Unit = {
-    import spark.implicits._
-    val rawData = spark.read
-      .option("header", "true")
-      .csv("d:/flash_sale.csv")
-      .filter($"os_family".isin("Android", "iOS"))
-      .filter($"os_family" === "iOS")
-      .withColumn("event_date", functions.to_date($"event_date"))
-      .withColumn("device_id", $"idfv")
-
-
-    val android = rawData
-
-    val androidNext = rawData
-      .withColumn("next_date", functions.date_sub($"event_date", 1))
-
-    val androidCurDay = android
-      .groupBy("event_date")
-      .agg(
-        functions.countDistinct("device_id").alias("cur_has_device")
-      )
-
-    val androidNextDay = android
-      .join(androidNext, android("event_date") === androidNext("next_date") and (android("device_id") === androidNext("device_id")))
-      .groupBy(android("event_date"))
-      .agg(
-        functions.countDistinct(android("device_id")).alias("next_has_device")
-      )
-
-    val androidNextDau = android
-      .groupBy("event_date")
-      .agg(
-        functions.countDistinct("domain_userid").alias("next_dau")
-      )
-      .withColumn("next_day", functions.date_sub($"event_date", 1))
-      .select("next_day", "next_dau")
-
-    val data2 = androidCurDay
-      .join(androidNextDay, Seq("event_date"), "left")
-      .join(androidNextDau, androidCurDay("event_date") === androidNextDau("next_day"), "left")
-      .withColumn("next_no_device", $"next_dau" - $"next_has_device")
-      .select("event_date", "cur_has_device", "next_has_device", "next_no_device")
-      .orderBy("event_date")
-      .cache()
-
-    writeToCSV(data2)
-
-
-  }
-
-  def d_1414(spark: SparkSession) = {
-    import spark.implicits._
-    val themisDb = new DataSource("themis_read")
-    val reportDb = new DataSource("themis_report_read")
-    val paySql =
-      """
-        |SELECT date(oi.pay_time)                           AS cur_day,
-        |
-        |       if(brand_id > 0, 'Y', 'N')                  AS is_brand,
-        |       count(DISTINCT oi.user_id)                  AS pay_user,
-        |       count(DISTINCT oi.order_id)                 AS pay_num,
-        |       sum(og.shipping_fee + og.shop_price_amount) AS gmv
-        |FROM order_info oi
-        |         INNER JOIN region r ON r.region_id = oi.country
-        |         INNER JOIN order_relation ore USING (order_id)
-        |         INNER JOIN order_goods og USING (order_id)
-        |         INNER JOIN goods g USING (goods_id)
-        |         LEFT JOIN category c ON g.cat_id = c.cat_id
-        |         LEFT JOIN category c_pri ON c.parent_id = c_pri.cat_id
-        |         LEFT JOIN category c_ga ON c_pri.parent_id = c_ga.cat_id
-        |WHERE oi.pay_time >= '2019-06-27'
-        |  AND oi.parent_order_id = 0
-        |  AND oi.pay_status >= 1
-        |  AND oi.from_domain LIKE 'api%'
-        |  AND ore.device_type IN (11, 12)
-        |GROUP BY cur_day, is_brand
-      """.stripMargin
-
-    val payDf = themisDb.load(spark, paySql)
-
-
-    val payAllSql =
-      """
-        |SELECT date(oi.pay_time)                           AS cur_day,
-        |
-        |       'all'                  AS is_brand,
-        |       count(DISTINCT oi.user_id)                  AS pay_user,
-        |       count(DISTINCT oi.order_id)                 AS pay_num,
-        |       sum(og.shipping_fee + og.shop_price_amount) AS gmv
-        |FROM order_info oi
-        |         INNER JOIN region r ON r.region_id = oi.country
-        |         INNER JOIN order_relation ore USING (order_id)
-        |         INNER JOIN order_goods og USING (order_id)
-        |         INNER JOIN goods g USING (goods_id)
-        |         LEFT JOIN category c ON g.cat_id = c.cat_id
-        |         LEFT JOIN category c_pri ON c.parent_id = c_pri.cat_id
-        |         LEFT JOIN category c_ga ON c_pri.parent_id = c_ga.cat_id
-        |WHERE oi.pay_time >= '2019-06-27'
-        |  AND oi.parent_order_id = 0
-        |  AND oi.pay_status >= 1
-        |  AND oi.from_domain LIKE 'api%'
-        |  AND ore.device_type IN (11, 12)
-        |GROUP BY cur_day, is_brand
-      """.stripMargin
-
-    val payAllDf = themisDb.load(spark, payAllSql)
-
-    val orderSql =
-      """
-        |SELECT date(oi.order_time)                           AS cur_day,
-        |       if(brand_id > 0, 'Y', 'N')                  AS is_brand,
-        |       count(DISTINCT oi.user_id)                  AS order_user,
-        |       count(DISTINCT oi.order_id)                 AS order_num
-        |FROM order_info oi
-        |         INNER JOIN region r ON r.region_id = oi.country
-        |         INNER JOIN order_relation ore USING (order_id)
-        |         INNER JOIN order_goods og USING (order_id)
-        |         INNER JOIN goods g USING (goods_id)
-        |         LEFT JOIN category c ON g.cat_id = c.cat_id
-        |         LEFT JOIN category c_pri ON c.parent_id = c_pri.cat_id
-        |         LEFT JOIN category c_ga ON c_pri.parent_id = c_ga.cat_id
-        |WHERE oi.order_time >= '2019-06-27'
-        |  AND oi.parent_order_id = 0
-        |  AND oi.from_domain LIKE 'api%'
-        |  AND ore.device_type IN (11, 12)
-        |GROUP BY cur_day, is_brand
-      """.stripMargin
-
-    val orderDf = themisDb.load(spark, orderSql)
-
-    val orderAllSql =
-      """
-        |SELECT date(oi.order_time)                           AS cur_day,
-        |       'all'                  AS is_brand,
-        |       count(DISTINCT oi.user_id)                  AS order_user,
-        |       count(DISTINCT oi.order_id)                 AS order_num
-        |FROM order_info oi
-        |         INNER JOIN region r ON r.region_id = oi.country
-        |         INNER JOIN order_relation ore USING (order_id)
-        |         INNER JOIN order_goods og USING (order_id)
-        |         INNER JOIN goods g USING (goods_id)
-        |         LEFT JOIN category c ON g.cat_id = c.cat_id
-        |         LEFT JOIN category c_pri ON c.parent_id = c_pri.cat_id
-        |         LEFT JOIN category c_ga ON c_pri.parent_id = c_ga.cat_id
-        |WHERE oi.order_time >= '2019-06-27'
-        |  AND oi.parent_order_id = 0
-        |  AND oi.from_domain LIKE 'api%'
-        |  AND ore.device_type IN (11, 12)
-        |GROUP BY cur_day, is_brand
-      """.stripMargin
-
-    val orderAllDf = themisDb.load(spark, orderAllSql)
-
-    val dau =
-      s"""
-         |SELECT tcdcd.action_date AS cur_day,
-         |       count(1)          AS dau
-         |FROM temp_country_device_cohort_details tcdcd
-         |WHERE tcdcd.action_date >= '2019-06-27'
-         |GROUP BY cur_day
-        """.stripMargin
-    val dauDf = reportDb
-      .load(spark, dau)
-
-    payDf
-      .join(orderDf, Seq("cur_day", "is_brand"))
-      .join(dauDf, "cur_day")
-      .withColumn("user_pay_success_rate", functions.concat(functions.round($"pay_user" * 100.0 / $"order_user", 2), functions.lit("%")))
-      .withColumn("order_pay_success_rate", functions.concat(functions.round($"pay_num" * 100.0 / $"order_num", 2), functions.lit("%")))
-      .withColumn("order_rate", functions.concat(functions.round($"order_user" * 100.0 / $"dau", 2), functions.lit("%")))
-      .withColumn("pay_rate", functions.concat(functions.round($"pay_user" * 100.0 / $"dau", 2), functions.lit("%")))
-      .orderBy("cur_day")
-      .show(false)
-
-    payAllDf
-      .join(orderAllDf, Seq("cur_day", "is_brand"))
-      .join(dauDf, "cur_day")
-      .withColumn("user_pay_success_rate", functions.concat(functions.round($"pay_user" * 100.0 / $"order_user", 2), functions.lit("%")))
-      .withColumn("order_pay_success_rate", functions.concat(functions.round($"pay_num" * 100.0 / $"order_num", 2), functions.lit("%")))
-      .withColumn("order_rate", functions.concat(functions.round($"order_user" * 100.0 / $"dau", 2), functions.lit("%")))
-      .withColumn("pay_rate", functions.concat(functions.round($"pay_user" * 100.0 / $"dau", 2), functions.lit("%")))
-      .orderBy("cur_day")
-      .show(false)
-  }
 
   def writeToCSV(data: DataFrame): Unit = {
     val savePath = "d:/result1"
@@ -535,8 +551,9 @@ object DruidSQL {
       .config("spark.sql.session.timeZone", "UTC")
       .getOrCreate()
     spark.sparkContext.setLogLevel("WARN")
+    //println(Conf.getString("s3.etl.primitive.a_b_devices"))
     import spark.implicits._
-    d_1467(spark)
+    d_1334(spark)
     //merge(spark)
     spark.close()
 
