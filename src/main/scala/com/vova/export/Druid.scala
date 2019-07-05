@@ -176,129 +176,197 @@ object DruidSQL {
     //    writeToCSV(data)
 
 
-    val oi = spark
-      .read
-      .option("header", "true")
-      .csv("d:/luckystar_winning_record.csv")
-
-    val oiUsers = oi.select("user_id")
-      .distinct()
-
-    val loi = spark
+    //表二
+    val winSpec = Window
+      .partitionBy("user_id")
+      .orderBy("pay_time")
+    val loi_1 = spark
       .read
       .option("header", "true")
       .csv("d:/luckystar_order_info.csv")
+      .withColumn("event_date", F.to_date($"pay_time"))
 
-    val loiUsers = loi.select("user_id")
+
+    val firstOrder = loi_1
+      .filter($"pay_status" >= 1)
+      .withColumn("first_pay_time", F.first("pay_time", true).over(winSpec))
+      .select("user_id", "first_pay_time")
       .distinct()
 
-    val newUsers =
-      oiUsers.except(loiUsers)
 
-
-    val oldUsers = loi
+    val loi = loi_1
+      .join(firstOrder, Seq("user_id"), "left")
+      .withColumn("diff", F.datediff($"pay_time", $"first_pay_time"))
+      .withColumn("user_tag", F.when($"diff" === 0 or ($"first_pay_time".isNull), "new").otherwise("old"))
 
     val users = spark
       .read
       .option("header", "true")
       .csv("d:/lucky_star_users.csv")
 
-    val newOrdered = newUsers
-      .join(loi, "user_id")
-      .withColumn("event_date", F.to_date($"create_time"))
+
+    //找到老用户
+    val oldUv = users
+      .withColumn("event_date", F.to_date($"event_date"))
+      .join(firstOrder, $"user_id" === $"user_unique_id" and ($"event_date" > $"first_pay_time"), "left")
+
       .groupBy("event_date")
       .agg(
-        F.approx_count_distinct("luckystar_order_id").alias("order_num"),
-        F.approx_count_distinct("user_id").alias("order_user")
+        F.approx_count_distinct("user_id").alias("old_uv")
       )
 
-    val newPayed = newUsers
-      .join(loi, "user_id")
-      .withColumn("event_date", F.to_date($"pay_time"))
-      .groupBy("event_date")
-      .agg(
-        F.approx_count_distinct("luckystar_order_id").alias("pay_num"),
-        F.approx_count_distinct("user_id").alias("pay_user"),
-        F.sum($"order_amount" - $"bonus").alias("gmv")
-      )
-
-    val newUv = newUsers
-      .join(users, $"user_id" === $"user_unique_id")
+    FileUtils.deleteDirectory(new File("d:/uvssss/"))
+    users
       .withColumn("event_date", F.to_date($"event_date"))
       .groupBy("event_date")
       .agg(
-        F.approx_count_distinct("user_id").alias("uv")
+        F.approx_count_distinct("user_unique_id").alias("all_uv")
       )
-
+      .join(oldUv, "event_date")
+      .withColumn("new_uv", $"all_uv" - $"old_uv")
+      .coalesce(1)
+      .write
+      .option("header", "true")
+      .mode(SaveMode.Overwrite)
+      .csv("d:/uvssss/")
 
     FileUtils.deleteDirectory(new File("d:/lucky_new_user/"))
     FileUtils.deleteDirectory(new File("d:/lucky_old_user/"))
-    newUv
-      .join(newOrdered, Seq("event_date"), "left")
-      .join(newPayed, Seq("event_date"), "left")
-      .coalesce(1)
-      .write
-      .option("header", "true")
-      .mode(SaveMode.Append)
-      .csv("d:/lucky_new_user/")
 
-
-    val oldOrdered = oldUsers
+    val oldOrdered = loi
       .withColumn("event_date", F.to_date($"create_time"))
-      .groupBy("event_date")
+      .groupBy("event_date", "user_tag")
       .agg(
         F.approx_count_distinct("luckystar_order_id").alias("order_num"),
         F.approx_count_distinct("user_id").alias("order_user")
       )
 
-    val oldPayed = oldUsers
+    val oldPayed = loi
       .withColumn("event_date", F.to_date($"pay_time"))
-      .groupBy("event_date")
+      .groupBy("event_date", "user_tag")
       .agg(
         F.approx_count_distinct("luckystar_order_id").alias("pay_num"),
         F.approx_count_distinct("user_id").alias("pay_user"),
         F.sum($"order_amount" - $"bonus").alias("gmv")
       )
 
-    val oldUv = oldUsers
-      .join(users, $"luckystar_order_id" === $"user_unique_id")
-      .withColumn("event_date", F.to_date($"event_date"))
-      .groupBy("event_date")
-      .agg(
-        F.approx_count_distinct("user_id").alias("uv")
-      )
-    oldUv
-      .join(oldOrdered, Seq("event_date"), "left")
-      .join(oldPayed, Seq("event_date"), "left")
+
+    oldOrdered
+      .join(oldPayed, Seq("event_date", "user_tag"), "left")
       .coalesce(1)
       .write
       .option("header", "true")
-      .mode(SaveMode.Append)
+      .mode(SaveMode.Overwrite)
       .csv("d:/lucky_old_user/")
 
-    //    val winspec = Window
+
+    //表三
+    //    val winSpec = Window
     //      .partitionBy("user_id")
-    //      .orderBy("pay_time")
+    //      .orderBy("create_time")
+    //    val oi = spark
+    //      .read
+    //      .option("header", "true")
+    //      .csv("d:/luckystar_winning_record.csv")
+    //      .withColumn("first_win_time", F.first("create_time", true).over(winSpec))
+    //      .select("user_id", "first_win_time")
+    //
+    //
+    //    val firstWin = oi
+    //      .select("user_id", "first_win_time")
+    //      .distinct()
+    //
+    //
+    //    val loi = spark
+    //      .read
+    //      .option("header", "true")
+    //      .csv("d:/luckystar_order_info.csv")
+    //      .join(firstWin, Seq("user_id"), "left")
+    //      .withColumn("user_tag", F.when($"pay_time" >= $"first_win_time", "win").otherwise("not_win"))
+    //
+    //    val users = spark
+    //      .read
+    //      .option("header", "true")
+    //      .csv("d:/lucky_star_users.csv")
+    //      .withColumn("event_date", F.to_date($"event_date"))
+    //      .join(loi.select("user_id", "first_win_time"), $"user_id" === $"user_unique_id")
+    //      .withColumn("user_tag", F.when($"event_date" >= $"first_win_time", "win").otherwise("not_win"))
+    //
+    //
+    //    FileUtils.deleteDirectory(new File("d:/lucky_new_user/"))
+    //    FileUtils.deleteDirectory(new File("d:/lucky_old_user/"))
+    //
+    //
+    //    val oldOrdered = loi
+    //      .withColumn("event_date", F.to_date($"create_time"))
+    //      .groupBy("event_date", "user_tag")
+    //      .agg(
+    //        F.approx_count_distinct("luckystar_order_id").alias("order_num"),
+    //        F.approx_count_distinct("user_id").alias("order_user")
+    //      )
+    //
+    //    val oldPayed = loi
+    //      .withColumn("event_date", F.to_date($"pay_time"))
+    //      .groupBy("event_date", "user_tag")
+    //      .agg(
+    //        F.approx_count_distinct("luckystar_order_id").alias("pay_num"),
+    //        F.approx_count_distinct("user_id").alias("pay_user"),
+    //        F.sum($"order_amount" - $"bonus").alias("gmv")
+    //      )
+    //
+    //    val oldUv = users
+    //      .groupBy("event_date", "user_tag")
+    //      .agg(
+    //        F.approx_count_distinct("user_id").alias("uv")
+    //      )
+    //
+    //    oldUv.show(200, false)
+    //    oldPayed.show(200, false)
+    //    oldUv
+    //      .join(oldOrdered, Seq("event_date", "user_tag"), "left")
+    //      .join(oldPayed, Seq("event_date", "user_tag"), "left")
+    //      .coalesce(1)
+    //      .write
+    //      .option("header", "true")
+    //      .mode(SaveMode.Append)
+    //      .csv("d:/lucky_old_user/")
+
+
+    //表4
+    //
+    //    val loi = spark
+    //      .read
+    //      .option("header", "true")
+    //      .csv("d:/luckystar_order_info.csv")
+    //      .filter($"pay_status" >= 1)
+    //
+    //    val winSpec = Window.partitionBy("user_id").orderBy("pay_time")
+    //
     //
     //    val payedLoi = loi
     //      .filter($"pay_status" >= 1)
+    //      .withColumn("first_pay_time", F.first("pay_time", true).over(winSpec))
+    //      .withColumn("diff", F.datediff($"pay_time", $"first_pay_time"))
+    //      .cache()
     //
+    //    payedLoi.show(false)
     //    val data2 = payedLoi
-    //      .withColumn("first_time", F.first("pay_time", true).over(winspec))
-    //      .withColumn("diff", F.lit(F.unix_timestamp($"pay_time") / 3600 - F.unix_timestamp($"first_time") / 3600))
-    //      .withColumn("diff", F.when($"diff" < 24, "[0, 1)")
-    //        .when($"diff" < 48, "[1, 2)")
-    //        .when($"diff" < 72, "[2, 3)")
-    //        .when($"diff" < 96, "[3, 4)")
-    //        .when($"diff" < 120, "[4, 5)")
+    //      .withColumn("diff", F
+    //        .when($"diff" === 0, "0")
+    //        .when($"diff" < 1, "(0, 1)")
+    //        .when($"diff" < 2, "[1, 2)")
+    //        .when($"diff" < 3, "[2, 3)")
+    //        .when($"diff" < 4, "[3, 4)")
+    //        .when($"diff" < 5, "[4, 5)")
     //        .otherwise("[5, )")
     //      )
-    //
     //      .withColumn("event_date", F.to_date($"pay_time"))
     //      .groupBy("event_date", "diff")
-    //      .count()
-
-    //  writeToCSV(data2)
+    //      .agg(
+    //        F.approx_count_distinct("user_id").alias("uv")
+    //      )
+    //
+    //    writeToCSV(data2)
 
 
   }
@@ -497,33 +565,28 @@ object DruidSQL {
     writeToCSV(data)
   }
 
-  def merge(spark: SparkSession): Unit = {
+  def d_1450(spark: SparkSession): Unit = {
     spark.read
       .option("header", "true")
-      .csv("d:/lao.csv")
-      .createOrReplaceTempView("lao")
+      .csv("d:/app_versions.csv")
+      .createOrReplaceTempView("av")
 
     spark.read
       .option("header", "true")
-      .csv("d:/lao.csv")
-      .createOrReplaceTempView("xin")
+      .csv("d:/notices.csv")
+      .createOrReplaceTempView("nt")
 
 
-    spark.sqlContext.sql(
+    val data = spark.sqlContext.sql(
       """
         |select
-        | event_type,
-        | push_date,
-        | sum(l.try_order_user + x.try_order_user) as try_order_user,
-        | sum(l.try_pay_user + x.try_pay_user) as try_pay_user,
-        | sum(l.try_pay_gmv + x.try_pay_gmv) as try_pay_user,
-        | sum(l.click_order_user + x.click_order_user) as click_order_user,
-        | sum(l.click_pay_user + x.click_pay_user) as click_pay_user,
-        | sum(l.click_pay_gmv + x.click_pay_gmv) as click_pay_user
-        |from lao l
-        | inner join xin x using(event_type, push_date)
-        |group by event_type, push_date
+        | *
+        |from av
+        | inner join nt using(device_id)
+        |where nt.platform = 'ios'
       """.stripMargin)
+
+    writeToCSV(data)
   }
 
 

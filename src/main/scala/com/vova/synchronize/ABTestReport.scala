@@ -10,35 +10,35 @@ import org.apache.spark.sql.{DataFrame, Dataset, SaveMode, SparkSession, functio
 object ABTestReport {
 
   def createTable: String =
-   """
-     |CREATE TABLE `ab_report`
-     |(
-     |    `id`               bigint AUTO_INCREMENT,
-     |    `cur_day`          timestamp NOT NULL DEFAULT '0000-00-00 00:00:00',
-     |    `region_code`      varchar(4)         DEFAULT '',
-     |    `platform`         varchar(8)         DEFAULT '',
-     |    `test_name`        varchar(32)        DEFAULT '',
-     |    `test_version`     varchar(16)        DEFAULT '',
-     |    `app_version`      varchar(16)        DEFAULT '',
-     |    `product_detail`   int                DEFAULT 0 COMMENT '商详页',
-     |    `cart`             int                DEFAULT 0 COMMENT '加购数',
-     |    `cart_success`     int                DEFAULT 0 COMMENT '加购成功数',
-     |    `place_order`      int                DEFAULT 0,
-     |    `checkout`         int                DEFAULT 0,
-     |    `order_user`       int                DEFAULT 0,
-     |    `order_num`        int                DEFAULT 0,
-     |    `pay_user`         int                DEFAULT 0,
-     |    `pay_num`          int                DEFAULT 0,
-     |    `gmv`              decimal(10, 2)     DEFAULT 0.00,
-     |    `create_time`      timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT 'create time',
-     |    `last_update_time` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT 'last update time',
-     |    PRIMARY KEY `id` (`id`),
-     |    UNIQUE (`cur_day`, `platform`, `region_code`, `test_name`, `test_version`, `app_version`),
-     |    KEY `test_name` (`test_name`),
-     |    KEY `region_code` (`region_code`)
-     |) ENGINE = MyISAM
-     |  DEFAULT CHARSET = utf8mb4 COMMENT ='ab报表';
-   """.stripMargin
+    """
+      |CREATE TABLE `ab_report`
+      |(
+      |    `id`               bigint AUTO_INCREMENT,
+      |    `cur_day`          timestamp NOT NULL DEFAULT '0000-00-00 00:00:00',
+      |    `region_code`      varchar(4)         DEFAULT '',
+      |    `platform`         varchar(8)         DEFAULT '',
+      |    `test_name`        varchar(32)        DEFAULT '',
+      |    `test_version`     varchar(16)        DEFAULT '',
+      |    `app_version`      varchar(16)        DEFAULT '',
+      |    `product_detail`   int                DEFAULT 0 COMMENT '商详页',
+      |    `cart`             int                DEFAULT 0 COMMENT '加购数',
+      |    `cart_success`     int                DEFAULT 0 COMMENT '加购成功数',
+      |    `place_order`      int                DEFAULT 0,
+      |    `checkout`         int                DEFAULT 0,
+      |    `order_user`       int                DEFAULT 0,
+      |    `order_num`        int                DEFAULT 0,
+      |    `pay_user`         int                DEFAULT 0,
+      |    `pay_num`          int                DEFAULT 0,
+      |    `gmv`              decimal(10, 2)     DEFAULT 0.00,
+      |    `create_time`      timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT 'create time',
+      |    `last_update_time` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT 'last update time',
+      |    PRIMARY KEY `id` (`id`),
+      |    UNIQUE (`cur_day`, `platform`, `region_code`, `test_name`, `test_version`, `app_version`),
+      |    KEY `test_name` (`test_name`),
+      |    KEY `region_code` (`region_code`)
+      |) ENGINE = MyISAM
+      |  DEFAULT CHARSET = utf8mb4 COMMENT ='ab报表';
+    """.stripMargin
 
   def dropTable: String =
     """
@@ -58,8 +58,8 @@ object ABTestReport {
   def main(args: Array[String]): Unit = {
 
     val reportDb = new DataSource("themis_report_write")
-//    reportDb.execute(dropTable)
-//    reportDb.execute(createTable)
+    //    reportDb.execute(dropTable)
+    //    reportDb.execute(createTable)
 
     val themisDb = new DataSource("themis_read")
     //    reportDb.execute(dropTable)
@@ -88,6 +88,8 @@ object ABTestReport {
     val ABDevices = spark.read
       .parquet(Conf.getString("s3.etl.primitive.a_b_devices"))
 
+    ABDevices.show(false)
+
     import spark.implicits._
     val dateFormat = DateTimeFormatter.ofPattern("yyyy/MM/dd")
     var (start, end) = (LocalDate.parse(args(0), dateFormat), LocalDate.parse(args(1), dateFormat))
@@ -110,34 +112,39 @@ object ABTestReport {
         .join(ABDevices, "device_id")
         .cache()
 
+      hit.show(false)
+
       //求gmv
       val orderInfo =
         s"""
-          |SELECT oi.order_id,
-          |       oi.order_time,
-          |       oi.goods_amount + oi.shipping_fee AS gmv,
-          |       oi.country                        AS region_code,
-          |       CASE
-          |           WHEN oi.device_type = 11 THEN 'ios'
-          |           WHEN oi.device_type = 12 THEN 'android'
-          |           END                           AS platform,
-          |       oi.user_id,
-          |       oi.pay_status,
-          |       oi.device_id,
-          |       oi.pay_time
-          |FROM order_info oi
-          |WHERE oi.order_time >= '$startS'
-          |  AND oi.order_time < '$endS'
-          |  AND oi.parent_order_id = 0
+           |SELECT oi.order_id,
+           |       oi.order_time,
+           |       oi.goods_amount + oi.shipping_fee AS gmv,
+           |       oi.country                        AS region_code,
+           |       CASE
+           |           WHEN oi.device_type = 11 THEN 'ios'
+           |           WHEN oi.device_type = 12 THEN 'android'
+           |           END                           AS platform,
+           |       oi.user_id,
+           |       oi.pay_status,
+           |       oi.device_id,
+           |       oi.pay_time
+           |FROM order_info oi
+           |WHERE oi.order_time >= '$startS'
+           |  AND oi.order_time < '$endS'
+           |  AND oi.parent_order_id = 0
         """.stripMargin
 
       val oiRaw = reportDb
         .load(spark, orderInfo)
+        .join(ABDevices, "device_id")
 
+      oiRaw.show(false)
       //组合每种情况
       for {
         platform <- List(F.col("platform"), F.lit("all"))
         regionCode <- List(F.col("region_code"), F.lit("all"))
+        appVersion <- List(F.col("app_version"), F.lit("all"))
       } {
         //商详页
         val productDetail = hit
@@ -145,10 +152,12 @@ object ABTestReport {
           .filter($"event_name" === "screen_view")
           .withColumn("region_code", regionCode)
           .withColumn("platform", platform)
+          .withColumn("app_version", appVersion)
           .groupBy("cur_day", "region_code", "platform", "test_name", "test_version", "app_version")
           .agg(
             F.approx_count_distinct("device_id").alias("product_detail")
           )
+
 
         //checkout
         val checkout = hit
@@ -156,6 +165,7 @@ object ABTestReport {
           .filter($"event_name" === "screen_view")
           .withColumn("region_code", regionCode)
           .withColumn("platform", platform)
+          .withColumn("app_version", appVersion)
           .groupBy("cur_day", "region_code", "platform", "test_name", "test_version", "app_version")
           .agg(
             F.approx_count_distinct("device_id").alias("checkout")
@@ -167,10 +177,13 @@ object ABTestReport {
           .filter($"page_code" === "cart")
           .withColumn("region_code", regionCode)
           .withColumn("platform", platform)
+          .withColumn("app_version", appVersion)
           .groupBy("cur_day", "region_code", "platform", "test_name", "test_version", "app_version")
           .agg(
             F.approx_count_distinct("device_id").alias("cart")
           )
+
+        cart.show(false)
 
         //加购成功
         val cartSuccess = hit
@@ -178,6 +191,7 @@ object ABTestReport {
           .filter($"event_name" === "common_click")
           .withColumn("region_code", regionCode)
           .withColumn("platform", platform)
+          .withColumn("app_version", appVersion)
           .groupBy("cur_day", "region_code", "platform", "test_name", "test_version", "app_version")
           .agg(
             F.approx_count_distinct("device_id").alias("cart_success")
@@ -188,26 +202,28 @@ object ABTestReport {
           .filter($"event_name" === "order_process")
           .withColumn("region_code", regionCode)
           .withColumn("platform", platform)
+          .withColumn("app_version", appVersion)
           .groupBy("cur_day", "region_code", "platform", "test_name", "test_version", "app_version")
           .agg(
             F.approx_count_distinct("device_id").alias("place_order")
           )
 
         val homepageDau = hit
-          .filter($"element_name" === "homepage")
+          .filter($"page_code" === "homepage")
           .filter($"event_name" === "screen_view")
           .withColumn("region_code", regionCode)
           .withColumn("platform", platform)
+          .withColumn("app_version", appVersion)
           .groupBy("cur_day", "region_code", "platform", "test_name", "test_version", "app_version")
           .agg(
             F.approx_count_distinct("device_id").alias("homepage_dau")
           )
 
         val orderedDf = oiRaw
-          .join(ABDevices, "device_id")
           .withColumn("region_code", regionCode)
           .withColumn("platform", platform)
           .withColumn("cur_day", F.to_date($"order_time"))
+          .withColumn("app_version", appVersion)
           .groupBy("cur_day", "region_code", "platform", "test_name", "test_version", "app_version")
           .agg(
             F.approx_count_distinct("device_id").alias("order_user"),
@@ -216,10 +232,10 @@ object ABTestReport {
 
         val payedDf = oiRaw
           .filter($"pay_status" >= 1)
-          .join(ABDevices, "device_id")
           .withColumn("region_code", regionCode)
           .withColumn("platform", platform)
           .withColumn("cur_day", F.to_date($"pay_time"))
+          .withColumn("app_version", appVersion)
           .groupBy("cur_day", "region_code", "platform", "test_name", "test_version", "app_version")
           .agg(
             F.approx_count_distinct("device_id").alias("pay_user"),
@@ -227,14 +243,15 @@ object ABTestReport {
             F.sum("gmv").alias("gmv")
           )
 
+
         val finalData = homepageDau
-          .join(productDetail, Seq("cur_day","region_code", "platform", "test_name", "test_version", "app_version"), "left")
-          .join(cart, Seq("cur_day","region_code", "platform", "test_name", "test_version", "app_version"), "left")
-          .join(cartSuccess, Seq("cur_day","region_code", "platform", "test_name", "test_version", "app_version"), "left")
-          .join(checkout, Seq("cur_day","region_code", "platform", "test_name", "test_version", "app_version"), "left")
-          .join(placeOrder, Seq("cur_day","region_code", "platform", "test_name", "test_version", "app_version"), "left")
-          .join(orderedDf,Seq("cur_day","region_code", "platform", "test_name", "test_version", "app_version"), "left")
-          .join(payedDf, Seq("cur_day","region_code", "platform", "test_name", "test_version", "app_version"), "left")
+          .join(productDetail, Seq("cur_day", "region_code", "platform", "test_name", "test_version", "app_version"), "left")
+          .join(cart, Seq("cur_day", "region_code", "platform", "test_name", "test_version", "app_version"), "left")
+          .join(cartSuccess, Seq("cur_day", "region_code", "platform", "test_name", "test_version", "app_version"), "left")
+          .join(checkout, Seq("cur_day", "region_code", "platform", "test_name", "test_version", "app_version"), "left")
+          .join(placeOrder, Seq("cur_day", "region_code", "platform", "test_name", "test_version", "app_version"), "left")
+          .join(orderedDf, Seq("cur_day", "region_code", "platform", "test_name", "test_version", "app_version"), "left")
+          .join(payedDf, Seq("cur_day", "region_code", "platform", "test_name", "test_version", "app_version"), "left")
           .select(
             F.coalesce($"cur_day", F.lit("0000-00-00")).alias("cur_day"),
             F.coalesce($"region_code", F.lit("")).alias("region_code"),
@@ -254,6 +271,8 @@ object ABTestReport {
             F.coalesce($"gmv", F.lit(0.00)).alias("gmv")
           )
           .cache()
+
+        finalData.show()
 
         reportDb.insertPure("ab_report", finalData, spark)
       }
