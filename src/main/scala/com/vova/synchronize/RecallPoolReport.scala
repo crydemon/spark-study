@@ -52,6 +52,11 @@ object RecallPoolReport {
     """.stripMargin
   }
 
+  def dropTable:String = {
+    """
+      |drop table recall_pool_report
+    """.stripMargin
+  }
   def isSingle(recallPool: String): Boolean = {
     recallPool.count(_ == '1') == 1
   }
@@ -88,7 +93,9 @@ object RecallPoolReport {
     val recallType = spark.udf.register("is_single_func", isSingle(_: String): Boolean)
     val recallName = spark.udf.register("get_recall_name", getRecallName(_: String, _: Int): String)
 
-    val rawHit = loadBatchProcessed("hit/" + path, spark)
+    val rawHit_1 = loadBatchProcessed("hit/" + path, spark)
+      .cache()
+    val rawHit = rawHit_1
       .filter($"recall_pool".isNotNull && F.length($"recall_pool") > 0 && $"goods_id".isNotNull && $"os".isin("android", "ios"))
       .select("recall_pool", "url", "referrer", "user_unique_id", "os", "country", "derived_ts", "page_code", "event_name", "element_name")
       .withColumn("goods_id", F.regexp_extract($"url", "goods_id=([0-9]+)", 1))
@@ -98,7 +105,15 @@ object RecallPoolReport {
       .withColumnRenamed("user_unique_id", "user_id")
       .withColumn("is_single", recallType($"recall_pool"))
 
-    rawHit.show(false)
+
+    val rawHit_2 = rawHit_1
+      .select("referrer", "user_unique_id", "os", "country", "derived_ts", "page_code", "event_name", "element_name")
+      .filter($"page_code" === "homepage" && $"event_name" === "screen_view" && $"os".isin("android", "ios"))
+      .withColumnRenamed("os", "platform")
+      .withColumn("event_time", F.to_utc_timestamp($"derived_ts", "yyyy-MM-dd HH:mm:ss"))
+      .withColumn("event_time", F.date_format($"event_time", "yyyy-MM-dd HH:00:00"))
+      .withColumnRenamed("user_unique_id", "user_id")
+    //rawHit.show(false)
 
 
     val start = path.replace('/', '-')
@@ -206,17 +221,15 @@ object RecallPoolReport {
         )
 
       //recall_times
-      val homePage = rawHit
-        .filter($"page_code" === "homepage")
-        .filter($"event_name" === "screen_view")
+      val homePage = rawHit_2
         .withColumn("platform", platform)
         .withColumn("country", country)
-        .withColumn("recall_pool", recallPool)
-        .withColumn("is_single", single)
-        .groupBy("event_time", "platform", "country", "recall_pool", "is_single")
+        .groupBy("event_time", "platform", "country")
         .agg(
           F.count(F.lit(1)).alias("recall_times")
         )
+
+      homePage.show(false)
 
       val pdSuccess = rawHit
         .filter($"element_name" === "pdAddToCartSuccess")
@@ -241,7 +254,7 @@ object RecallPoolReport {
           F.sum("order_goods_gmv").alias("gmv").alias("gmv")
         )
       val data = ctr
-        .join(homePage, Seq("event_time", "platform", "country", "recall_pool", "is_single"), "left")
+        .join(homePage, Seq("event_time", "platform", "country"), "left")
         .join(pdSuccess, Seq("event_time", "platform", "country", "recall_pool", "is_single"), "left")
         .join(gmv, Seq("event_time", "platform", "country", "recall_pool", "is_single"), "left")
         .select(
@@ -272,29 +285,30 @@ object RecallPoolReport {
 
   def main(args: Array[String]): Unit = {
     val reportDb = new DataSource("themis_report_write")
+    reportDb.execute(dropTable)
     reportDb.execute(createTable)
     val appName = "recall_pool"
-    println(appName)
-    //    val spark = SparkSession.builder
-    //      .appName("recall_pool")
-    //      .master("local[*]")
-    //      .config("spark.sql.session.timeZone", "UTC")
-    //      .getOrCreate()
-    //    spark.sparkContext.setLogLevel("WARN")
-    //    val dateFormat = DateTimeFormatter.ofPattern("yyyy/MM/dd")
-    //    val (start, end) = (LocalDate.parse(args(0), dateFormat), LocalDate.parse(args(1), dateFormat))
-    val spark = SparkSession.builder
-      .master("yarn")
-      .appName(appName)
-      .config("spark.serializer", "org.apache.spark.serializer.KryoSerializer")
-      .config("spark.yarn.maxAppAttempts", 1)
-      .config("spark.sql.session.timeZone", "UTC")
-      .getOrCreate()
-    spark.sparkContext.setLogLevel("WARN")
-    spark.sparkContext.setCheckpointDir("s3://vomkt-emr-rec/checkpoint/")
+//    println(appName)
+//    val spark = SparkSession.builder
+//      .appName("recall_pool")
+//      .master("local[*]")
+//      .config("spark.sql.session.timeZone", "UTC")
+//      .getOrCreate()
+//    spark.sparkContext.setLogLevel("WARN")
+//    val dateFormat = DateTimeFormatter.ofPattern("yyyy/MM/dd")
+//    val (start, end) = (LocalDate.parse(args(0), dateFormat), LocalDate.parse(args(1), dateFormat))
+        val spark = SparkSession.builder
+          .master("yarn")
+          .appName(appName)
+          .config("spark.serializer", "org.apache.spark.serializer.KryoSerializer")
+          .config("spark.yarn.maxAppAttempts", 1)
+          .config("spark.sql.session.timeZone", "UTC")
+          .getOrCreate()
+        spark.sparkContext.setLogLevel("WARN")
+        spark.sparkContext.setCheckpointDir("s3://vomkt-emr-rec/checkpoint/")
 
-    val dateFormat = DateTimeFormatter.ofPattern("yyyy/MM/dd")
-    var (start, end) = (LocalDate.parse(args(0), dateFormat), LocalDate.parse(args(1), dateFormat))
+        val dateFormat = DateTimeFormatter.ofPattern("yyyy/MM/dd")
+        var (start, end) = (LocalDate.parse(args(0), dateFormat), LocalDate.parse(args(1), dateFormat))
     transform(start.format(dateFormat), spark)
   }
 }

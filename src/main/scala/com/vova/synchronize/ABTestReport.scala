@@ -75,10 +75,10 @@ object ABTestReport {
   def main(args: Array[String]): Unit = {
 
     val reportDb = new DataSource("themis_report_write")
-    reportDb.execute(dropABDevicesTable)
-    reportDb.execute(createABDevicesTable)
-    reportDb.execute(dropTable)
-    reportDb.execute(createTable)
+//    reportDb.execute(dropABDevicesTable)
+//    reportDb.execute(createABDevicesTable)
+//    reportDb.execute(dropTable)
+//    reportDb.execute(createTable)
 
 
     val appName = "ab_report"
@@ -114,8 +114,7 @@ object ABTestReport {
       //原数据
       val rawData = spark.read
         .json("s3://vomkt-evt/batch-processed/hit/" + startS + "T*")
-        .withColumn("os_family", F.lower($"os_family"))
-        .filter($"os_family".isin("android", "ios"))
+        .filter(F.lower($"os").isin("android", "ios"))
         .withColumn("device_id", F.coalesce($"device_id", $"organic_idfv", $"android_id", $"idfa", $"idfv"))
         .withColumn("cur_day", F.to_date($"derived_ts"))
 
@@ -125,8 +124,8 @@ object ABTestReport {
         .filter($"test_version".isNotNull)
         .filter($"event_name" === "test_create")
         .filter($"test_name".isin(needCollectTestNames))
-        .select("device_id", "os_family", "test_name", "test_version", "app_version")
-        .withColumnRenamed("os_family", "platform")
+        .select("device_id", "os", "test_name", "test_version", "app_version")
+        .withColumnRenamed("os", "platform")
         .distinct()
 
       reportDb.insertPure("ab_devices", rawABDevices, spark)
@@ -139,8 +138,10 @@ object ABTestReport {
 
 
       val hit = rawData
-        .select("event_name", "element_name", "country", "platform", "page_code", "url", "device_id", "cur_day")
+        .filter($"os_family".isin("android", "ios"))
+        .select("event_name", "element_name", "country", "os", "page_code", "url", "device_id", "cur_day")
         .withColumnRenamed("country", "region_code")
+        .withColumnRenamed("os", "platform")
         .join(ABDevices, "device_id")
         .cache()
 

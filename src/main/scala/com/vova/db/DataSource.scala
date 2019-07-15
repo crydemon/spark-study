@@ -104,10 +104,10 @@ class DataSource(configPath: String) {
         val connection = DriverManager.getConnection(url, username, password)
         val statement = connection.createStatement()
         val insertSql = insertData + lines
-        println(insertSql)
+        //println(insertSql)
         try {
           val status = statement.executeUpdate(insertSql)
-          println(s"insert:$status")
+          //println(s"insert:$status")
         } catch {
           case e: Exception => {
             println("insert error")
