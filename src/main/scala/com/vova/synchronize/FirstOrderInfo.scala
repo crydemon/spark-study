@@ -221,7 +221,7 @@ object FirstOrderInfo {
 
     //    val spark = SparkSession.builder
     //      .appName(appName)
-    //      .master("local[*]")is_new_user
+    //      .master("local[*]")
     //      .getOrCreate()
     //    spark.sparkContext.setLogLevel("WARN")
     val dateFormat = DateTimeFormatter.ofPattern("yyyy/MM/dd")

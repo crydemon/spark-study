@@ -41,10 +41,10 @@ object PageCohort {
       .withColumn("os_family", F.lower($"os_family"))
       .filter($"os_family".isin("android", "ios"))
       .withColumn("device_id", F.coalesce($"device_id", $"organic_idfv", $"android_id", $"idfa", $"idfv"))
-      .withColumn("cur_day", F.to_date($"derived_ts"))
-      .withColumnRenamed("country", "region_code")
-      .select("os_family", "region_code", "page_code", "event_name", "device_id", "cur_day")
+      .select("os_family", "country", "page_code", "event_name", "device_id", "derived_ts")
       .withColumnRenamed("os_family", "platform")
+      .withColumnRenamed("country", "region_code")
+      .withColumn("cur_day", F.to_date($"derived_ts"))
   }
 
   def preFilter(data: DataFrame, pageCode: (String, String), regionCode: Column, platform: Column): DataFrame = {
@@ -60,13 +60,7 @@ object PageCohort {
     val reportDb = new DataSource("themis_report_write")
     //reportDb.execute(createTable)
 
-    //val themisDb = new DataSource("themis_read")
-    //    reportDb.execute(dropTable)
-    //    reportDb.execute(createTable)
-
-
     val appName = "page_cohort"
-
     val spark = SparkSession.builder
       .master("yarn")
       .appName(appName)
@@ -85,22 +79,27 @@ object PageCohort {
       val next = start.plusDays(1)
       //原数据
       val dau = loadBatchData("hit/" + start.format(dateFormat), spark).cache()
+
       val next_1 = {
-        if (start.plusDays(1).compareTo(LocalDate.now()) < 0) loadBatchData("hit/" + start.plusDays(1).format(dateFormat), spark)
+        if (start.plusDays(1).compareTo(LocalDate.now()) < 0)
+          loadBatchData("hit/" + start.plusDays(1).format(dateFormat), spark)
         else dau.limit(1)
-      }
+      }.select("device_id")
       val next_3 = {
-        if (start.plusDays(3).compareTo(LocalDate.now()) < 0) loadBatchData("hit/" + start.plusDays(3).format(dateFormat), spark)
+        if (start.plusDays(3).compareTo(LocalDate.now()) < 0)
+          loadBatchData("hit/" + start.plusDays(3).format(dateFormat), spark)
         else dau.limit(1)
-      }
+      }.select("device_id")
       val next_7 = {
-        if (start.plusDays(7).compareTo(LocalDate.now()) < 0) loadBatchData("hit/" + start.plusDays(7).format(dateFormat), spark)
+        if (start.plusDays(7).compareTo(LocalDate.now()) < 0)
+          loadBatchData("hit/" + start.plusDays(7).format(dateFormat), spark)
         else dau.limit(1)
-      }
+      }.select("device_id")
       val next_28 = {
-        if (start.plusDays(28).compareTo(LocalDate.now()) < 0) loadBatchData("hit/" + start.plusDays(28).format(dateFormat), spark)
+        if (start.plusDays(28).compareTo(LocalDate.now()) < 0)
+          loadBatchData("hit/" + start.plusDays(28).format(dateFormat), spark)
         else dau.limit(1)
-      }
+      }.select("device_id")
 
       //需要计算的page_code
       val pageCodes = List(
@@ -109,9 +108,9 @@ object PageCohort {
       )
 
       for {
+        pageCode <- pageCodes
         platform <- List(F.col("platform"), F.lit("all"))
         regionCode <- List(F.col("region_code"), F.lit("all"))
-        pageCode <- pageCodes
       } {
         val dauDf = preFilter(dau, pageCode, regionCode, platform)
         val cohort_0 = dauDf
@@ -121,26 +120,26 @@ object PageCohort {
           )
 
         val cohort_1 = dauDf
-          .join(preFilter(next_1, pageCode, regionCode, platform).select("device_id"), "device_id")
+          .join(next_1, "device_id")
           .groupBy("cur_day", "region_code", "platform", "page_code")
           .agg(
             F.approx_count_distinct("device_id").alias("next_1")
           )
 
         val cohort_3 = dauDf
-          .join(preFilter(next_3, pageCode, regionCode, platform).select("device_id"), "device_id")
+          .join(next_3, "device_id")
           .groupBy("cur_day", "region_code", "platform", "page_code")
           .agg(
             F.approx_count_distinct("device_id").alias("next_3")
           )
         val cohort_7 = dauDf
-          .join(preFilter(next_7, pageCode, regionCode, platform).select("device_id"), "device_id")
+          .join(next_7, "device_id")
           .groupBy("cur_day", "region_code", "platform", "page_code")
           .agg(
             F.approx_count_distinct("device_id").alias("next_7")
           )
         val cohort_28 = dauDf
-          .join(preFilter(next_28, pageCode, regionCode, platform).select("device_id"), "device_id")
+          .join(next_28, "device_id")
           .groupBy("cur_day", "region_code", "platform", "page_code")
           .agg(
             F.approx_count_distinct("device_id").alias("next_28")
@@ -156,7 +155,6 @@ object PageCohort {
             F.coalesce($"region_code", F.lit("")).alias("region_code"),
             F.coalesce($"platform", F.lit("")).alias("platform"),
             F.coalesce($"page_code", F.lit("")).alias("page_code"),
-
             F.coalesce($"dau", F.lit(0)).alias("dau"),
             F.coalesce($"next_1", F.lit(0)).alias("next_1"),
             F.coalesce($"next_3", F.lit(0)).alias("next_3"),
@@ -167,7 +165,7 @@ object PageCohort {
 
         dataFinal.show()
 
-        reportDb.insertPure("ab_report", dataFinal, spark)
+        reportDb.insertPure("page_cohort_report", dataFinal, spark)
       }
       start = next
     }

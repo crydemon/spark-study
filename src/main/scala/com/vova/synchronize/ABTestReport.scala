@@ -3,7 +3,6 @@ package com.vova.synchronize
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
 
-import com.vova.conf.Conf
 import com.vova.db.DataSource
 import org.apache.spark.sql.{DataFrame, Dataset, SaveMode, SparkSession, functions => F}
 
@@ -40,34 +39,49 @@ object ABTestReport {
       |  DEFAULT CHARSET = utf8mb4 COMMENT ='ab报表';
     """.stripMargin
 
+
+  def createABDevicesTable: String = {
+    """
+      |CREATE TABLE `ab_devices`
+      |(
+      |    `id`               bigint AUTO_INCREMENT,
+      |    `platform`         varchar(8)         DEFAULT '',
+      |    `test_name`        varchar(64)        DEFAULT '',
+      |    `test_version`     varchar(16)        DEFAULT '',
+      |    `device_id`        varchar(64)        DEFAULT '',
+      |    `app_version`      varchar(16)        DEFAULT '',
+      |    `create_time`      timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT 'create time',
+      |    `expire_time`      timestamp NOT NULL DEFAULT '2022-03-01 00:00:00' COMMENT '过期则删除设备记录',
+      |    `last_update_time` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT 'last update time',
+      |    PRIMARY KEY `id` (`id`),
+      |    UNIQUE (`device_id`, `platform`, `test_name`, `test_version`, `app_version`),
+      |    KEY `test_name` (`test_name`)
+      |) ENGINE = MyISAM
+      |  DEFAULT CHARSET = utf8mb4 COMMENT ='ab devices'
+    """.stripMargin
+  }
+
   def dropTable: String =
     """
       |drop table ab_report
     """.stripMargin
 
-  def updateDeviceSql: String =
+  def dropABDevicesTable: String =
     """
-      |SELECT replace(config -> '$[0].test', '"', '')      AS test_version,
-      |       replace(config -> '$[0].test_name', '"', '') AS test_name,
-      |       devices                                      AS device_id,
-      |       app_version,
-      |       abtest_version
-      |FROM a_b_test_record
+      |drop table ab_devices
     """.stripMargin
+
 
   def main(args: Array[String]): Unit = {
 
     val reportDb = new DataSource("themis_report_write")
-    //    reportDb.execute(dropTable)
-    //    reportDb.execute(createTable)
-
-    val themisDb = new DataSource("themis_read")
-    //    reportDb.execute(dropTable)
-    //    reportDb.execute(createTable)
+    reportDb.execute(dropABDevicesTable)
+    reportDb.execute(createABDevicesTable)
+    reportDb.execute(dropTable)
+    reportDb.execute(createTable)
 
 
-    val appName = "brand_report"
-
+    val appName = "ab_report"
     val spark = SparkSession.builder
       .master("yarn")
       .appName(appName)
@@ -79,40 +93,57 @@ object ABTestReport {
     spark.sparkContext.setCheckpointDir("s3://vomkt-emr-rec/checkpoint/")
 
 
-    themisDb
-      .load(spark, updateDeviceSql)
-      .write
-      .mode(SaveMode.Overwrite)
-      .parquet(Conf.getString("s3.etl.primitive.a_b_devices"))
-
-    val ABDevices = spark.read
-      .parquet(Conf.getString("s3.etl.primitive.a_b_devices"))
-
-    ABDevices.show(false)
-
     import spark.implicits._
     val dateFormat = DateTimeFormatter.ofPattern("yyyy/MM/dd")
     var (start, end) = (LocalDate.parse(args(0), dateFormat), LocalDate.parse(args(1), dateFormat))
+
+    val ABDevicesSql =
+      """
+        |select  device_id, test_name, test_version, app_version
+        |from ab_devices
+      """.stripMargin
+
+    val ABDevicesInMysql = reportDb.load(spark, ABDevicesSql)
+
+    val needCollectTestNames = ("new_ProductDetail5.0")
 
     while (start.compareTo(end) <= 0) {
       val next = start.plusDays(1)
       val startS = start.format(dateFormat)
       val endS = next.format(dateFormat)
       //原数据
-      val hit = spark.read
+      val rawData = spark.read
         .json("s3://vomkt-evt/batch-processed/hit/" + startS + "T*")
-        //.json("d:/vomkt-evt/batch-processed/hit/" + startS)
         .withColumn("os_family", F.lower($"os_family"))
         .filter($"os_family".isin("android", "ios"))
         .withColumn("device_id", F.coalesce($"device_id", $"organic_idfv", $"android_id", $"idfa", $"idfv"))
         .withColumn("cur_day", F.to_date($"derived_ts"))
-        .select("event_name", "element_name", "os_family", "country", "page_code", "url", "device_id", "cur_day")
-        .withColumnRenamed("country", "region_code")
+
+      val rawABDevices = rawData
+        .filter($"test_name".isNotNull)
+        .filter($"device_id".isNotNull)
+        .filter($"test_version".isNotNull)
+        .filter($"event_name" === "test_create")
+        .filter($"test_name".isin(needCollectTestNames))
+        .select("device_id", "os_family", "test_name", "test_version", "app_version")
         .withColumnRenamed("os_family", "platform")
+        .distinct()
+
+      reportDb.insertPure("ab_devices", rawABDevices, spark)
+
+      val ABDevices = ABDevicesInMysql
+        .union(rawABDevices
+          .select("device_id", "test_name", "test_version", "app_version")
+        )
+        .distinct()
+
+
+      val hit = rawData
+        .select("event_name", "element_name", "country", "platform", "page_code", "url", "device_id", "cur_day")
+        .withColumnRenamed("country", "region_code")
         .join(ABDevices, "device_id")
         .cache()
 
-      hit.show(false)
 
       //求gmv
       val orderInfo =
@@ -139,7 +170,6 @@ object ABTestReport {
         .load(spark, orderInfo)
         .join(ABDevices, "device_id")
 
-      oiRaw.show(false)
       //组合每种情况
       for {
         platform <- List(F.col("platform"), F.lit("all"))

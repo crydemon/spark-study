@@ -1,0 +1,112 @@
+JvmtiExport can_access_local_variables 0
+JvmtiExport can_hotswap_or_post_breakpoint 0
+JvmtiExport can_post_on_exceptions 0
+# 167 ciObject found
+ciMethod java/lang/System arraycopy (Ljava/lang/Object;ILjava/lang/Object;II)V 102401 1 12800 0 -1
+ciMethod java/io/InputStream read ([BII)I 0 0 1 0 -1
+ciMethod java/io/InputStream available ()I 0 0 1 0 -1
+ciMethod java/lang/Math max (JJ)J 4097 1 853 0 0
+ciMethod java/lang/Math min (II)I 4097 1 137541 0 -1
+ciMethod java/io/BufferedInputStream getInIfOpen ()Ljava/io/InputStream; 209 1 2729 0 0
+ciMethod java/io/BufferedInputStream getBufIfOpen ()[B 4097 1 16370 0 0
+ciMethod java/io/BufferedInputStream fill ()V 9 1 27 0 0
+ciMethod java/io/BufferedInputStream read1 ([BII)I 4097 1 3750 0 0
+ciMethod java/io/BufferedInputStream read ([BII)I 4097 1 3737 0 0
+ciMethod java/util/concurrent/atomic/AtomicReferenceFieldUpdater compareAndSet (Ljava/lang/Object;Ljava/lang/Object;Ljava/lang/Object;)Z 0 0 1 0 -1
+ciMethod java/io/DataInputStream read ([BII)I 2049 1 5377 0 0
+ciMethod org/apache/hadoop/fs/Seekable getPos ()J 0 0 1 0 -1
+ciMethod org/apache/hadoop/fs/FSDataInputStream seek (J)V 0 0 1 0 -1
+ciMethod org/apache/hadoop/fs/FSDataInputStream getPos ()J 4097 1 16589 0 672
+ciMethodData java/io/BufferedInputStream getBufIfOpen ()[B 2 16370 orig 264 8 131 177 89 0 0 0 0 80 40 210 27 0 0 0 0 80 1 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 77 68 79 32 101 120 116 114 97 32 100 97 116 97 32 108 111 99 107 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 2 0 0 145 239 1 0 1 0 0 0 0 0 0 0 0 0 0 0 2 0 0 0 0 0 5 0 2 0 0 0 48 0 0 0 255 255 255 255 7 0 6 0 0 0 0 0 data 6 0x60007 0x3df2 0x30 0x0 0xf0002 0x0 oops 0
+ciMethodData java/io/BufferedInputStream read ([BII)I 2 3737 orig 264 8 131 177 89 0 0 0 0 32 46 210 27 0 0 0 0 208 2 0 0 64 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 77 68 79 32 101 120 116 114 97 32 100 97 116 97 32 108 111 99 107 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 2 0 0 201 100 0 0 105 0 0 0 0 0 0 0 0 0 0 0 2 0 0 0 1 0 23 0 2 0 0 0 112 1 0 0 255 255 255 255 2 0 1 0 0 0 0 0 data 46 0x10002 0xc99 0x130007 0xc99 0x30 0x0 0x1a0002 0x0 0x1f0007 0xc99 0x20 0x0 0x310002 0xca6 0x380007 0xc96 0x58 0x10 0x3d0007 0x1 0x38 0xf 0x420003 0xf 0x18 0x520007 0x13 0x20 0xc84 0x600007 0x0 0x70 0x13 0x650005 0x4 0x1fa7b700 0xe 0x1fa7b790 0x1 0x680007 0xd 0x20 0x6 0x6e0003 0xd 0xffffffffffffff08 oops 2 35 java/io/FileInputStream 37 java/util/jar/JarInputStream
+ciMethodData java/io/BufferedInputStream read1 ([BII)I 2 3750 orig 264 8 131 177 89 0 0 0 0 8 45 210 27 0 0 0 0 152 2 0 0 0 1 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 77 68 79 32 101 120 116 114 97 32 100 97 116 97 32 108 111 99 107 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 2 0 0 49 101 0 0 1 0 0 0 0 0 0 0 0 0 0 0 2 0 0 0 0 0 25 0 2 0 0 0 56 1 0 0 255 255 255 255 7 0 13 0 0 0 0 0 data 39 0xd0007 0x20f 0xe0 0xa97 0x120002 0xa97 0x160007 0x16 0x80 0xa82 0x1d0007 0x1 0x60 0xa81 0x210002 0xa81 0x270005 0xa7d 0x1fa7b790 0x2 0x1fa7b700 0x2 0x2c0002 0x17 0x3c0007 0xd 0x20 0xa 0x440007 0x20f 0x38 0xd 0x490003 0xd 0x18 0x500002 0x21c 0x5b0002 0x21c oops 2 18 java/util/jar/JarInputStream 20 java/io/FileInputStream
+ciMethodData java/io/BufferedInputStream getInIfOpen ()Ljava/io/InputStream; 2 2729 orig 264 8 131 177 89 0 0 0 0 160 39 210 27 0 0 0 0 80 1 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 77 68 79 32 101 120 116 114 97 32 100 97 116 97 32 108 111 99 107 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 26 0 0 0 121 84 0 0 1 0 0 0 0 0 0 0 0 0 0 0 2 0 0 0 0 0 0 0 0 0 0 0 48 0 0 0 255 255 255 255 7 0 6 0 0 0 0 0 data 6 0x60007 0xa8f 0x30 0x0 0xf0002 0x0 oops 0
+ciMethod org/apache/hadoop/fs/ChecksumFileSystem$ChecksumFSInputChecker getChecksumFilePos (J)J 0 0 1 0 -1
+ciMethod org/apache/hadoop/fs/ChecksumFileSystem$ChecksumFSInputChecker readChunk (J[BII[B)I 3073 1 2689 0 0
+ciMethod org/apache/hadoop/fs/FSInputChecker readChunk (J[BII[B)I 0 0 1 0 -1
+ciMethod org/apache/hadoop/fs/FSInputChecker needChecksum ()Z 2049 1 5370 0 0
+ciMethod org/apache/hadoop/fs/FSInputChecker read ([BII)I 2049 1 2685 0 0
+ciMethod org/apache/hadoop/fs/FSInputChecker fill ()V 0 0 1 0 -1
+ciMethod org/apache/hadoop/fs/FSInputChecker read1 ([BII)I 2049 1 2689 0 0
+ciMethod org/apache/hadoop/fs/FSInputChecker readChecksumChunk ([BII)I 3073 1 2689 0 0
+ciMethod org/apache/hadoop/fs/FSInputChecker verifySums ([BII)V 0 0 1 0 -1
+ciMethod org/apache/hadoop/fs/FSInputChecker getPos ()J 111937 1 14271 0 0
+ciMethod org/apache/hadoop/fs/FSInputChecker readFully (Ljava/io/InputStream;[BII)I 3073 1 2688 0 0
+ciMethod org/apache/hadoop/fs/FSInputStream getPos ()J 0 0 1 0 -1
+ciMethod org/apache/hadoop/fs/RawLocalFileSystem$LocalFSFileInputStream getPos ()J 3073 1 1408 0 0
+ciMethod org/apache/hadoop/fs/BufferedFSInputStream getPos ()J 2049 1 2688 0 0
+ciMethodData java/lang/Math max (JJ)J 1 853 orig 264 8 131 177 89 0 0 0 0 176 80 204 27 0 0 0 0 112 1 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 77 68 79 32 101 120 116 114 97 32 100 97 116 97 32 108 111 99 107 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 2 0 0 169 10 0 0 1 0 0 0 0 0 0 0 0 0 0 0 2 0 0 0 0 0 6 0 2 0 0 0 56 0 0 0 255 255 255 255 7 0 3 0 0 0 0 0 data 7 0x30007 0x0 0x38 0x155 0x70003 0x155 0x18 oops 0
+ciMethodData java/io/DataInputStream read ([BII)I 2 5377 orig 264 8 131 177 89 0 0 0 0 240 195 239 27 0 0 0 0 144 1 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 77 68 79 32 101 120 116 114 97 32 100 97 116 97 32 108 111 99 107 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 1 0 0 9 160 0 0 1 0 0 0 0 0 0 0 0 0 0 0 2 0 0 0 0 0 3 0 2 0 0 0 48 0 0 0 255 255 255 255 5 0 7 0 0 0 0 0 data 6 0x70005 0x0 0x20acdea0 0x9fd 0x20acdf50 0xa04 oops 2 2 org/apache/hadoop/fs/ChecksumFileSystem$ChecksumFSInputChecker 4 org/apache/hadoop/fs/BufferedFSInputStream
+ciMethodData org/apache/hadoop/fs/FSDataInputStream getPos ()J 2 16589 orig 264 8 131 177 89 0 0 0 0 0 81 27 28 0 0 0 0 168 1 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 77 68 79 32 101 120 116 114 97 32 100 97 116 97 32 108 111 99 107 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 2 0 0 105 246 1 0 1 0 0 0 0 0 0 0 0 0 0 0 2 0 0 0 0 0 3 0 2 0 0 0 96 0 0 0 255 255 255 255 4 0 4 0 0 0 0 0 data 12 0x40004 0x0 0x20acdea0 0x35c4 0x20acdf50 0x909 0x70005 0x0 0x20acdea0 0x35c4 0x20acdf50 0x908 oops 4 2 org/apache/hadoop/fs/ChecksumFileSystem$ChecksumFSInputChecker 4 org/apache/hadoop/fs/BufferedFSInputStream 8 org/apache/hadoop/fs/ChecksumFileSystem$ChecksumFSInputChecker 10 org/apache/hadoop/fs/BufferedFSInputStream
+ciMethodData org/apache/hadoop/fs/FSInputChecker getPos ()J 1 14271 orig 264 8 131 177 89 0 0 0 0 248 102 114 40 0 0 0 0 88 1 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 77 68 79 32 101 120 116 114 97 32 100 97 116 97 32 108 111 99 107 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 2 0 0 185 8 0 0 1 0 0 0 0 0 0 0 0 0 0 0 2 0 0 0 0 0 6 0 2 0 0 0 16 0 0 0 255 255 255 255 2 0 15 0 0 0 0 0 data 2 0xf0002 0x117 oops 0
+ciMethodData org/apache/hadoop/fs/FSInputChecker needChecksum ()Z 2 5370 orig 264 8 131 177 89 0 0 0 0 72 91 114 40 0 0 0 0 120 1 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 77 68 79 32 101 120 116 114 97 32 100 97 116 97 32 108 111 99 107 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 1 0 0 209 159 0 0 1 0 0 0 0 0 0 0 0 0 0 0 2 0 0 0 0 0 9 0 2 0 0 0 88 0 0 0 255 255 255 255 7 0 4 0 0 0 0 0 data 11 0x40007 0x0 0x58 0x13fa 0xb0007 0x13fa 0x38 0x0 0xf0003 0x0 0x18 oops 0
+ciMethodData org/apache/hadoop/fs/FSInputChecker read ([BII)I 2 2685 orig 264 8 131 177 89 0 0 0 0 144 93 114 40 0 0 0 0 48 2 0 0 48 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 77 68 79 32 101 120 116 114 97 32 100 97 116 97 32 108 111 99 107 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 1 0 0 233 75 0 0 33 0 0 0 0 0 0 0 0 0 0 0 2 0 0 0 1 0 15 0 2 0 0 0 240 0 0 0 255 255 255 255 7 0 14 0 0 0 0 0 data 30 0xe0007 0x97d 0x30 0x0 0x150002 0x0 0x1a0007 0x97d 0x20 0x0 0x2c0002 0x981 0x330007 0x979 0x58 0x8 0x380007 0x4 0x38 0x4 0x3d0003 0x4 0x18 0x4d0007 0x4 0x20 0x975 0x530003 0x4 0xffffffffffffff78 oops 0
+ciMethodData org/apache/hadoop/fs/FSInputChecker read1 ([BII)I 2 2689 orig 264 8 131 177 89 0 0 0 0 56 97 114 40 0 0 0 0 40 2 0 0 160 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 77 68 79 32 101 120 116 114 97 32 100 97 116 97 32 108 111 99 107 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 1 0 0 9 76 0 0 1 0 0 0 0 0 0 0 0 0 0 0 2 0 0 0 0 0 13 0 2 0 0 0 200 0 0 0 255 255 255 255 7 0 13 0 0 0 0 0 data 25 0xd0007 0x0 0x80 0x981 0x150007 0x0 0x30 0x981 0x1c0002 0x981 0x250002 0x0 0x2c0007 0x0 0x20 0x0 0x3a0007 0x0 0x38 0x0 0x3f0003 0x0 0x18 0x510002 0x0 oops 0
+ciMethodData org/apache/hadoop/fs/BufferedFSInputStream getPos ()J 2 2688 orig 264 8 131 177 89 0 0 0 0 152 5 115 40 0 0 0 0 216 1 0 0 32 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 77 68 79 32 101 120 116 114 97 32 100 97 116 97 32 108 111 99 107 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 1 0 0 1 76 0 0 1 0 0 0 0 0 0 0 0 0 0 0 2 0 0 0 0 0 5 0 2 0 0 0 144 0 0 0 255 255 255 255 7 0 4 0 0 0 0 0 data 18 0x40007 0x980 0x30 0x0 0xd0002 0x0 0x150004 0x0 0x1f443270 0x980 0x0 0x0 0x180005 0x0 0x1f443270 0x980 0x0 0x0 oops 2 8 org/apache/hadoop/fs/RawLocalFileSystem$LocalFSFileInputStream 14 org/apache/hadoop/fs/RawLocalFileSystem$LocalFSFileInputStream
+ciMethodData org/apache/hadoop/fs/FSInputChecker readChecksumChunk ([BII)I 2 2689 orig 264 8 131 177 89 0 0 0 0 32 99 114 40 0 0 0 0 160 4 0 0 8 3 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 77 68 79 32 101 120 116 114 97 32 100 97 116 97 32 108 111 99 107 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 128 1 0 0 9 72 0 0 9 72 0 0 0 0 0 0 0 0 0 0 2 0 0 0 1 0 28 0 2 0 0 0 64 3 0 0 255 255 255 255 5 0 37 0 0 0 0 0 data 104 0x250005 0x0 0x20acdea0 0x901 0x0 0x0 0x2c0007 0x8 0x80 0x8f9 0x300005 0x0 0x20acdea0 0x8f9 0x0 0x0 0x330007 0x8f9 0x30 0x0 0x3b0002 0x0 0x4d0003 0x901 0x270 0x590002 0x0 0x5e0005 0x0 0x0 0x0 0x0 0x0 0x620005 0x0 0x0 0x0 0x0 0x0 0x670005 0x0 0x0 0x0 0x0 0x0 0x6e0005 0x0 0x0 0x0 0x0 0x0 0x730005 0x0 0x0 0x0 0x0 0x0 0x7c0002 0x0 0x7f0005 0x0 0x0 0x0 0x0 0x0 0x820005 0x0 0x0 0x0 0x0 0x0 0x870005 0x0 0x0 0x0 0x0 0x0 0x8e0007 0x0 0x20 0x0 0x990005 0x0 0x0 0x0 0x0 0x0 0x9c0007 0x0 0x68 0x0 0xa40005 0x0 0x0 0x0 0x0 0x0 0xa70003 0x0 0x18 0xaf0007 0x0 0xfffffffffffffce0 0x901 oops 2 2 org/apache/hadoop/fs/ChecksumFileSystem$ChecksumFSInputChecker 12 org/apache/hadoop/fs/ChecksumFileSystem$ChecksumFSInputChecker
+ciMethodData org/apache/hadoop/fs/ChecksumFileSystem$ChecksumFSInputChecker readChunk (J[BII[B)I 2 2689 orig 264 8 131 177 89 0 0 0 0 128 73 114 40 0 0 0 0 192 7 0 0 184 4 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 77 68 79 32 101 120 116 114 97 32 100 97 116 97 32 108 111 99 107 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 128 1 0 0 9 72 0 0 1 0 0 0 0 0 0 0 0 0 0 0 2 0 0 0 0 0 53 0 2 0 0 0 72 6 0 0 255 255 255 255 5 0 4 0 0 0 0 0 data 201 0x40005 0x0 0x20acdea0 0x901 0x0 0x0 0x70007 0x901 0x438 0x0 0xd0007 0x0 0x50 0x0 0x120007 0x0 0x30 0x0 0x190002 0x0 0x200007 0x0 0x50 0x0 0x280007 0x0 0x30 0x0 0x2f0002 0x0 0x360007 0x0 0x50 0x0 0x3f0007 0x0 0x30 0x0 0x460002 0x0 0x560002 0x0 0x5d0002 0x0 0x680005 0x0 0x0 0x0 0x0 0x0 0x6c0007 0x0 0x50 0x0 0x750005 0x0 0x0 0x0 0x0 0x0 0x830005 0x0 0x0 0x0 0x0 0x0 0x8a0007 0x0 0x210 0x0 0x910007 0x0 0x1f0 0x0 0x9c0002 0x0 0xa10005 0x0 0x0 0x0 0x0 0x0 0xa80005 0x0 0x0 0x0 0x0 0x0 0xad0005 0x0 0x0 0x0 0x0 0x0 0xb10005 0x0 0x0 0x0 0x0 0x0 0xb60005 0x0 0x0 0x0 0x0 0x0 0xbb0005 0x0 0x0 0x0 0x0 0x0 0xc00005 0x0 0x0 0x0 0x0 0x0 0xc50005 0x0 0x0 0x0 0x0 0x0 0xc80005 0x0 0x0 0x0 0x0 0x0 0xcc0002 0x0 0xd20007 0x0 0x38 0x0 0xd80003 0x0 0x28 0xe60002 0x0 0xf00005 0x0 0x25e52a10 0x901 0x0 0x0 0xf40007 0x900 0x50 0x0 0xfc0005 0x0 0x0 0x0 0x0 0x0 0x1080002 0x900 0x10f0007 0x901 0x150 0x0 0x1140007 0x0 0x130 0x0 0x11f0002 0x0 0x1240005 0x0 0x0 0x0 0x0 0x0 0x12b0005 0x0 0x0 0x0 0x0 0x0 0x1300005 0x0 0x0 0x0 0x0 0x0 0x1340005 0x0 0x0 0x0 0x0 0x0 0x1370005 0x0 0x0 0x0 0x0 0x0 0x13b0002 0x0 oops 2 2 org/apache/hadoop/fs/ChecksumFileSystem$ChecksumFSInputChecker 143 org/apache/hadoop/fs/FSDataInputStream
+ciMethodData org/apache/hadoop/fs/FSInputChecker readFully (Ljava/io/InputStream;[BII)I 2 2688 orig 264 8 131 177 89 0 0 0 0 240 106 114 40 0 0 0 0 32 2 0 0 168 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 77 68 79 32 101 120 116 114 97 32 100 97 116 97 32 108 111 99 107 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 128 1 0 0 1 72 0 0 33 0 0 0 0 0 0 0 0 0 0 0 2 0 0 0 1 0 11 0 2 0 0 0 192 0 0 0 255 255 255 255 5 0 13 0 0 0 0 0 data 24 0xd0005 0x0 0x25e52a10 0x904 0x0 0x0 0x140007 0x8f9 0x58 0xc 0x190007 0x4 0x38 0x8 0x1e0003 0x8 0x18 0x2e0007 0x4 0x20 0x8f5 0x340003 0x4 0xffffffffffffff58 oops 1 2 org/apache/hadoop/fs/FSDataInputStream
+ciMethodData org/apache/hadoop/fs/RawLocalFileSystem$LocalFSFileInputStream getPos ()J 2 1408 orig 264 8 131 177 89 0 0 0 0 184 245 114 40 0 0 0 0 32 1 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 77 68 79 32 101 120 116 114 97 32 100 97 116 97 32 108 111 99 107 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 128 1 0 0 1 32 0 0 1 0 0 0 0 0 0 0 0 0 0 0 2 0 0 0 0 0 3 0 1 0 0 0 0 0 0 0 255 255 255 255 0 0 0 0 0 0 0 0 data 0 oops 0
+instanceKlass org/apache/spark/TaskFailedReason$class
+instanceKlass org/apache/spark/Resubmitted$
+instanceKlass org/apache/spark/scheduler/GettingResultEvent
+instanceKlass org/apache/spark/scheduler/SpeculativeTaskSubmitted
+instanceKlass org/apache/spark/scheduler/CompletionEvent
+instanceKlass org/apache/spark/Success$
+instanceKlass org/apache/spark/scheduler/TaskResultGetter$$anon$3
+instanceKlass org/apache/spark/scheduler/DirectTaskResult
+instanceKlass org/apache/spark/scheduler/TaskResult
+instanceKlass org/spark_project/guava/collect/AbstractIterator$1
+instanceKlass org/spark_project/guava/collect/ForwardingObject
+instanceKlass org/apache/spark/storage/BlockManagerMessages$StopBlockManagerMaster$
+instanceKlass org/apache/spark/storage/BlockManagerMessages$RemoveExecutor
+instanceKlass org/apache/spark/storage/BlockManagerMessages$RemoveBlock
+instanceKlass org/apache/spark/util/kvstore/ArrayWrappers$ComparableObjectArray
+instanceKlass org/apache/spark/status/ExecutorStageSummaryWrapper
+instanceKlass org/apache/spark/status/api/v1/ExecutorStageSummary
+instanceKlass org/apache/spark/storage/BlockManagerMessages$RemoveBroadcast
+instanceKlass org/apache/spark/storage/BlockManagerMessages$RemoveShuffle
+instanceKlass org/apache/spark/storage/BlockManagerMessages$RemoveRdd
+instanceKlass org/apache/spark/storage/BlockManagerMessages$ToBlockManagerSlave
+instanceKlass org/apache/spark/storage/BlockManagerMessages$GetMatchingBlockIds
+instanceKlass org/apache/spark/storage/BlockManagerMessages$GetBlockStatus
+instanceKlass org/apache/spark/storage/BlockManagerMessages$GetStorageStatus$
+instanceKlass org/apache/spark/storage/BlockManagerMessages$GetMemoryStatus$
+instanceKlass org/apache/spark/storage/BlockManagerMessages$GetExecutorEndpointRef
+instanceKlass org/apache/spark/storage/BlockManagerMessages$GetPeers
+instanceKlass org/apache/spark/storage/BlockManagerMessages$GetLocationsMultipleBlockIds
+instanceKlass org/apache/spark/executor/TaskMetrics$
+instanceKlass org/apache/spark/storage/BlockManagerMessages$GetLocationsAndStatus
+instanceKlass org/apache/spark/storage/BlockManagerMessages$GetLocations
+instanceKlass scala/concurrent/duration/package$DurationInt$
+instanceKlass scala/concurrent/duration/package$DurationInt
+instanceKlass org/apache/spark/storage/BlockManagerMessages$BlockManagerHeartbeat
+instanceKlass org/apache/spark/scheduler/AccumulableInfo$
+instanceKlass org/apache/spark/HeartbeatReceiver$$anonfun$receiveAndReply$1$$anon$2
+instanceKlass org/apache/spark/HeartbeatResponse
+instanceKlass org/apache/spark/Heartbeat
+instanceKlass com/fasterxml/jackson/core/json/DupDetector
+instanceKlass com/fasterxml/jackson/core/io/NumberInput
+instanceKlass scala/Function4$class
+instanceKlass org/apache/spark/sql/catalyst/json/JacksonUtils$
+instanceKlass com/fasterxml/jackson/core/json/ByteSourceJsonBootstrapper
+instanceKlass org/apache/spark/sql/catalyst/json/CreateJacksonParser$
+instanceKlass org/apache/spark/sql/vectorized/ColumnarBatch
+instanceKlass org/apache/spark/unsafe/bitset/BitSetMethods
+instanceKlass org/apache/hadoop/io/LongWritable
+instanceKlass org/apache/spark/sql/execution/datasources/RecordReaderIterator
+instanceKlass org/apache/hadoop/io/compress/DoNotPool
+instanceKlass org/apache/hadoop/util/DataChecksum
+instanceKlass org/apache/hadoop/io/compress/zlib/BuiltInGzipDecompressor
+instanceKlass org/apache/hadoop/io/compress/zlib/ZlibCompressor
+instanceKlass org/apache/hadoop/io/compress/zlib/ZlibFactory
+instanceKlass org/apache/hadoop/io/compress/CodecPool
+instanceKlass org/apache/hadoop/util/IdentityHashStore
+instanceKlass org/apache/hadoop/util/LineReader
+instanceKlass org/apache/hadoop/mapreduce/StatusReporter
+instanceKlass org/apache/hadoop/mapreduce/task/JobContextImpl
+instanceKlass org/apache/hadoop/mapreduce/ID
+instanceKlass org/apache/hadoop/mapreduce/RecordReader
+instanceKlass org/apache/hadoop/mapreduce/InputSplit
+instanceKlass org/apache/spark/sql/execution/datasources/HadoopFileLinesReader
+instanceKlass org/codehaus/janino/UnitCompiler$14$1

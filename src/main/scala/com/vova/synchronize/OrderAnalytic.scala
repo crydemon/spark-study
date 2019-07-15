@@ -1,17 +1,13 @@
-package com.vova.causeanalytic
+package com.vova.synchronize
 
 import java.time.{LocalDateTime, ZoneOffset}
 import java.time.format.DateTimeFormatter
-import java.time.temporal.ChronoUnit
+import java.util.regex.Pattern
 
 import com.vova.conf.Conf
 import com.vova.db.DataSource
-import com.vova.snowplow.schema.VovaEventHelper
-import com.vova.utils.S3
 import org.apache.spark.sql.expressions.Window
 import org.apache.spark.sql.{DataFrame, Dataset, SparkSession, functions => F}
-
-import scala.util.Try
 
 object CauseAnaliticEventType {
   val goods_click = 0
@@ -43,7 +39,7 @@ case class CauseAnaliticEvent(
                                order_goods_gmv: Double
                              )
 
-object Main {
+object OrderAnalytic {
 
   private val mysql_time_fmt = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:00:00")
 
@@ -98,79 +94,113 @@ object Main {
       }
   }
 
+  def loadBatchData(path: String, spark: SparkSession): DataFrame = {
+    import spark.implicits._
+    spark.read
+      .json("s3://vomkt-evt/batch-processed/" + path + "T*")
+      //.json("D:\\vomkt-evt\\batch-processed\\hit\\2019\\06\\23")
+  }
+
   def filterUtf8m4(s: String): String = {
     if (s == null) s else s.replaceAll("[^\\u0000-\\uD7FF\\uE000-\\uFFFF]", "?")
   }
 
-  def loadS3Events(spark: SparkSession, start: LocalDateTime, end: LocalDateTime): Dataset[CauseAnaliticEvent] = {
+  def loadS3Events(spark: SparkSession, start: LocalDateTime): Dataset[CauseAnaliticEvent] = {
     import spark.implicits._
-    S3.loadEnrichData(spark, start.minus(1, ChronoUnit.HOURS), end)
-      .transform(S3.dedup)
-      .flatMap { row =>
-        val e = new VovaEventHelper(row)
-        val uid = e.common_context.user_unique_id
-        if (uid <= 0) {
-          None
-        } else {
-          e.event_name match {
-            case "goods_click" => {
-              val goods_id = e.goods_click_event.goods_id
-              if (goods_id <= 0) {
-                None
-              } else {
-                Some(CauseAnaliticEvent(
-                  event_type = CauseAnaliticEventType.goods_click,
-                  timestamp = LocalDateTime.parse(e.derived_ts, DateTimeFormatter.ISO_DATE_TIME).toEpochSecond(ZoneOffset.UTC),
-                  uid_short = uid,
-                  domain_userid = null,
-                  device_id = null,
-                  gender = null,
-                  country = null,
-                  platform = null,
-                  os_type = null,
-                  app_version = null,
-                  virtual_goods_id = goods_id,
-                  goods_sn = null,
-                  page_code = e.common_context.page_code,
-                  list_type = filterUtf8m4(e.goods_click_event.list_type),
-                  list_uri = filterUtf8m4(e.goods_click_event.list_uri),
-                  order_id = -1,
-                  order_goods_rec_id = -1,
-                  order_goods_gmv = 0
-                ))
-              }
+    val dateFormat = DateTimeFormatter.ofPattern("yyyy/MM/dd")
+    val data = loadBatchData("hit/" + start.toLocalDate.format(dateFormat), spark)
+      .filter(F.regexp_extract($"user_unique_id", "[0-9]+", 0).isNotNull)
+      .filter($"event_name".isin("goods_click", "common_click"))
+    data.flatMap { row =>
+      val uid = row.getAs[String]("user_unique_id").toInt
+      val event_name = row.getAs[String]("event_name")
+      val derived_ts = row.getAs[String]("derived_ts")
+      val page_code = row.getAs[String]("page_code")
+      val list_type = row.getAs[String]("list_type")
+      val list_uri = row.getAs[String]("list_uri")
+      val pattern = Pattern.compile("goods_id=(\\d+)")
+      val virtualPattern = Pattern.compile("virtual_goods_id=(\\d+)")
+      event_name match {
+        case "goods_click" => {
+          val url = row.getAs[String]("url")
+          var matcher = pattern.matcher(url)
+          var goods_id = -1
+          if (matcher.find()) {
+            goods_id = matcher.group(1).toInt
+          } else {
+            matcher = pattern.matcher(url)
+            matcher = virtualPattern.matcher(url)
+            if (matcher.find()) {
+              goods_id = matcher.group(1).toInt
             }
-            case "common_click" => {
-              val goods_id = Try(e.common_click_event.element_id.toInt).getOrElse(-1)
-              if (goods_id <= 0 || e.common_click_event.element_name != "pdAddToCartSuccess") {
-                None
-              } else {
-                Some(CauseAnaliticEvent(
-                  event_type = CauseAnaliticEventType.add_to_cart,
-                  timestamp = LocalDateTime.parse(e.derived_ts, DateTimeFormatter.ISO_DATE_TIME).toEpochSecond(ZoneOffset.UTC),
-                  uid_short = uid,
-                  domain_userid = e.domain_userid,
-                  device_id = e.app_common_context.device_id,
-                  gender = e.common_context.gender,
-                  country = e.common_context.country,
-                  platform = e.platform,
-                  os_type = e.os_type,
-                  app_version = e.app_common_context.app_version,
-                  virtual_goods_id = goods_id,
-                  goods_sn = null,
-                  page_code = null, // we don't care page_code of addToCart, set to null in order to compute last_click_page_code
-                  list_type = null,
-                  list_uri = null,
-                  order_id = -1,
-                  order_goods_rec_id = -1,
-                  order_goods_gmv = 0
-                ))
-              }
-            }
-            case _ => None
+          }
+          if (goods_id <= 0) {
+            None
+          } else {
+            Some(CauseAnaliticEvent(
+              event_type = CauseAnaliticEventType.goods_click,
+              timestamp = LocalDateTime.parse(derived_ts, DateTimeFormatter.ISO_DATE_TIME).toEpochSecond(ZoneOffset.UTC),
+              uid_short = uid,
+              domain_userid = null,
+              device_id = null,
+              gender = null,
+              country = null,
+              platform = null,
+              os_type = null,
+              app_version = null,
+              virtual_goods_id = goods_id,
+              goods_sn = null,
+              page_code = page_code,
+              list_type = filterUtf8m4(list_type),
+              list_uri = filterUtf8m4(list_uri),
+              order_id = -1,
+              order_goods_rec_id = -1,
+              order_goods_gmv = 0
+            ))
           }
         }
+        case "common_click" => {
+          val url = row.getAs[String]("url")
+          var matcher = pattern.matcher(url)
+          var goods_id = -1
+          if (matcher.find()) {
+            goods_id = matcher.group(1).toInt
+          } else {
+            matcher = pattern.matcher(url)
+            matcher = virtualPattern.matcher(url)
+            if (matcher.find()) {
+              goods_id = matcher.group(1).toInt
+            }
+          }
+          val element_name = row.getAs[String]("element_name")
+          if (goods_id <= 0 || element_name != "pdAddToCartSuccess") {
+            None
+          } else {
+            Some(CauseAnaliticEvent(
+              event_type = CauseAnaliticEventType.add_to_cart,
+              timestamp = LocalDateTime.parse(derived_ts, DateTimeFormatter.ISO_DATE_TIME).toEpochSecond(ZoneOffset.UTC),
+              uid_short = uid,
+              domain_userid = row.getAs[String]("domain_userid"),
+              device_id = row.getAs[String]("device_id"),
+              gender = row.getAs[String]("gender"),
+              country = row.getAs[String]("country"),
+              platform = row.getAs[String]("platform"),
+              os_type = row.getAs[String]("os"),
+              app_version = row.getAs[String]("app_version"),
+              virtual_goods_id = goods_id,
+              goods_sn = null,
+              page_code = null, // we don't care page_code of addToCart, set to null in order to compute last_click_page_code
+              list_type = null,
+              list_uri = null,
+              order_id = -1,
+              order_goods_rec_id = -1,
+              order_goods_gmv = 0
+            ))
+          }
+        }
+        case _ => None
       }
+    }
   }
 
   def run(spark: SparkSession, start: LocalDateTime, end: LocalDateTime): Unit = {
@@ -179,7 +209,8 @@ object Main {
     val winspec = Window
       .partitionBy("uid_short", "virtual_goods_id")
       .orderBy("timestamp")
-    val df = loadS3Events(spark, start, end)
+    val df = loadS3Events(spark, start)
+      .union(loadS3Events(spark, start.minusDays(1)))
       .union(loadDbEvents(spark, start, end))
       .withColumn("last_click_list_uri",
         F.last("list_uri", ignoreNulls = true).over(winspec)
@@ -189,7 +220,9 @@ object Main {
       )
       .withColumn("last_click_page_code",
         F.last("page_code", ignoreNulls = true).over(winspec)
-      ).cache()
+      )
+      .cache()
+    df.show(false)
     val df_cart = df
       .filter($"event_type" === CauseAnaliticEventType.add_to_cart)
       .select(
@@ -240,11 +273,20 @@ object Main {
 
     spark.sparkContext.setCheckpointDir(Conf.getString("s3.rec.checkpoint"))
 
+    //    val spark = SparkSession.builder
+    //      .appName("hitTest")
+    //      .master("local[6]")
+    //      .config("spark.executor.cores", 2)
+    //      .config("spark.sql.shuffle.partitions", 30)
+    //      .config("spark.default.parallelism", 18)
+    //      .getOrCreate()
+    //    spark.sparkContext.setLogLevel("WARN")
+
     val inFmt = DateTimeFormatter.ofPattern("yyyy/MM/dd/HH")
     val (start, end) = (LocalDateTime.parse(args(0), inFmt), LocalDateTime.parse(args(1), inFmt))
     run(spark, start, end)
-
-
+    //    val data = loadS3Events(spark, start)
+    //    data.show(false)
     spark.stop()
   }
 }
