@@ -19,7 +19,6 @@ case class OrderCause(
                        recall_pool: String,
                        goods_id: Int,
                        user_id: Long,
-                       country: String,
                        platform: String,
                        timestamp: Long,
                        order_goods_gmv: Double
@@ -34,9 +33,7 @@ object RecallPoolReport {
       |    `id`                 bigint AUTO_INCREMENT,
       |    `event_time`         timestamp NOT NULL DEFAULT '0000-00-00 00:00:00',
       |    `is_single`          varchar(8)         DEFAULT '',
-      |    `region_code`        varchar(4)         DEFAULT '',
       |    `platform`           varchar(8)         DEFAULT '',
-      |    `recall_pool`        varchar(64)        DEFAULT '召回集',
       |    `recall_name`        varchar(48)        DEFAULT '召回名称',
       |    `recall_times`       int                DEFAULT 0 COMMENT '召回次数',
       |    `clicks`             int                DEFAULT 0 COMMENT '点击',
@@ -44,19 +41,19 @@ object RecallPoolReport {
       |    `add_to_bag_success` int                DEFAULT 0 COMMENT '加车成功数',
       |    `gmv`                decimal(10, 2)     DEFAULT 0 COMMENT 'gmv',
       |    PRIMARY KEY `id` (`id`),
-      |    UNIQUE (`event_time`, `platform`, `region_code`, `recall_pool`, `is_single`, `recall_name`),
-      |    KEY `recall_pool` (`recall_pool`),
-      |    KEY `region_code` (`region_code`)
+      |    UNIQUE (`event_time`, `platform`, `is_single`, `recall_name`),
+      |    KEY `recall_name` (`recall_name`)
       |) ENGINE = MyISAM
       |  DEFAULT CHARSET = utf8mb4 COMMENT ='召回集报表';
     """.stripMargin
   }
 
-  def dropTable:String = {
+  def dropTable: String = {
     """
       |drop table recall_pool_report
     """.stripMargin
   }
+
   def isSingle(recallPool: String): Boolean = {
     recallPool.count(_ == '1') == 1
   }
@@ -64,8 +61,8 @@ object RecallPoolReport {
   def getRecallName(recallPool: String, index: Int): String = {
     if (recallPool.length >= 32 && recallPool.charAt(index) == '1') {
       index match {
-        case 0 => "click"
-        case 1 => "order"
+        case 0 => "cf1_click"
+        case 1 => "cf2_order"
         case 2 => "search_top"
         case 3 => "sell_top"
         case 4 => "non_brand"
@@ -73,7 +70,8 @@ object RecallPoolReport {
         case 6 => "cat_recall_low_price"
         case 7 => "cat_recall_discount"
         case 8 => "gender_recall"
-        case 9 => "new_user"
+        case 9 => "cf3_embedding_click_list"
+        case 10 => "new_user"
         case _ => "no_matched"
       }
     } else {
@@ -97,7 +95,7 @@ object RecallPoolReport {
       .cache()
     val rawHit = rawHit_1
       .filter($"recall_pool".isNotNull && F.length($"recall_pool") > 0 && $"goods_id".isNotNull && $"os".isin("android", "ios"))
-      .select("recall_pool", "url", "referrer", "user_unique_id", "os", "country", "derived_ts", "page_code", "event_name", "element_name")
+      .select("recall_pool", "url", "referrer", "user_unique_id", "os", "derived_ts", "page_code", "event_name", "element_name")
       .withColumn("goods_id", F.regexp_extract($"url", "goods_id=([0-9]+)", 1))
       .withColumnRenamed("os", "platform")
       .withColumn("event_time", F.to_utc_timestamp($"derived_ts", "yyyy-MM-dd HH:mm:ss"))
@@ -107,7 +105,7 @@ object RecallPoolReport {
 
 
     val rawHit_2 = rawHit_1
-      .select("referrer", "user_unique_id", "os", "country", "derived_ts", "page_code", "event_name", "element_name")
+      .select("referrer", "user_unique_id", "os", "derived_ts", "page_code", "event_name", "element_name")
       .filter($"page_code" === "homepage" && $"event_name" === "screen_view" && $"os".isin("android", "ios"))
       .withColumnRenamed("os", "platform")
       .withColumn("event_time", F.to_utc_timestamp($"derived_ts", "yyyy-MM-dd HH:mm:ss"))
@@ -121,7 +119,6 @@ object RecallPoolReport {
     val sql =
       s"""
          |SELECT oi.order_time,
-         |       r.region_code                            AS country,
          |       CASE
          |           WHEN ore.device_type = 11 THEN 'ios'
          |           WHEN ore.device_type = 12 THEN 'android'
@@ -135,7 +132,6 @@ object RecallPoolReport {
          |         JOIN order_relation ore USING (order_sn)
          |         JOIN virtual_goods vg
          |              ON vg.goods_id = og.goods_id
-         |         JOIN region r ON r.region_id = oi.country
          |         JOIN goods g ON g.goods_id = vg.goods_id
          |WHERE oi.parent_order_id = 0
          |  AND oi.order_time >= '$start'
@@ -152,10 +148,9 @@ object RecallPoolReport {
           recall_pool = null,
           goods_id = row.getAs[Int]("virtual_goods_id"),
           user_id = row.getAs[Long]("user_id"),
-          country = row.getAs[String]("country"),
           platform = row.getAs[String]("platform"),
           timestamp = row.getAs[Timestamp]("order_time").toLocalDateTime.toEpochSecond(ZoneOffset.UTC),
-          order_goods_gmv = row.getDecimal(5).doubleValue())
+          order_goods_gmv = row.getDecimal(4).doubleValue())
       )
     val df2 = rawHit
       .filter($"element_name" === "pdAddToCartSuccess" && $"event_name" === "common_click" && $"user_id".isNotNull)
@@ -171,7 +166,6 @@ object RecallPoolReport {
           case _: Exception => -1
         },
         user_id = row.getAs[String]("user_id").toLong,
-        country = row.getAs[String]("country"),
         platform = row.getAs[String]("platform"),
         timestamp = LocalDateTime.parse(row.getAs[String]("derived_ts"), DateTimeFormatter.ISO_DATE_TIME).toEpochSecond(ZoneOffset.UTC),
         order_goods_gmv = 0.00
@@ -193,7 +187,7 @@ object RecallPoolReport {
     val rawGoodsCtr = loadBatchProcessed("goods_ctr_v2/" + path, spark)
       .filter($"recall_pool".isNotNull)
       .filter($"os_type".isin("android", "ios"))
-      .select("recall_pool", "goods_id", "impressions", "clicks", "user_unique_id", "os_type", "country", "derived_ts")
+      .select("recall_pool", "goods_id", "impressions", "clicks", "user_unique_id", "os_type", "derived_ts")
       .withColumn("is_single", recallType($"recall_pool"))
       .withColumnRenamed("os_type", "platform")
       .withColumn("event_time", F.to_utc_timestamp($"derived_ts", "yyyy-MM-dd HH:00:00"))
@@ -205,16 +199,14 @@ object RecallPoolReport {
     val reportDb = new DataSource("themis_report_write")
     for {
       platform <- List(F.lit("all"), F.col("platform"))
-      country <- List(F.lit("all"), F.col("country"))
-      recallPool <- List(F.lit("all"), F.col("recall_pool"))
-      single <- List(F.lit("all"), F.col("is_single"))
+      i <- 0 to 10
+      recallName <- List(F.lit("all"), recallName($"recall_pool", F.lit(i)))
     } {
       val ctr = rawGoodsCtr
         .withColumn("platform", platform)
-        .withColumn("country", country)
-        .withColumn("recall_pool", recallPool)
-        .withColumn("is_single", single)
-        .groupBy("event_time", "platform", "country", "recall_pool", "is_single")
+        .withColumn("recall_name", recallName)
+        .filter($"recall_name" =!= "no_matched")
+        .groupBy("event_time", "platform", "recall_name", "is_single")
         .agg(
           F.sum($"impressions").alias("impressions"),
           F.sum($"clicks").alias("clicks")
@@ -223,8 +215,7 @@ object RecallPoolReport {
       //recall_times
       val homePage = rawHit_2
         .withColumn("platform", platform)
-        .withColumn("country", country)
-        .groupBy("event_time", "platform", "country")
+        .groupBy("event_time", "platform")
         .agg(
           F.count(F.lit(1)).alias("recall_times")
         )
@@ -236,32 +227,29 @@ object RecallPoolReport {
         .filter($"event_name" === "common_click")
         .filter($"referrer".like("%homepage%")) //可能有问题
         .withColumn("platform", platform)
-        .withColumn("country", country)
-        .withColumn("recall_pool", recallPool)
-        .withColumn("is_single", single)
-        .groupBy("event_time", "platform", "country", "recall_pool", "is_single")
+        .withColumn("recall_name", recallName)
+        .filter($"recall_name" =!= "no_matched")
+        .groupBy("event_time", "platform", "recall_name", "is_single")
         .agg(
           F.count(F.lit(1)).alias("add_to_bag_success")
         )
 
       val gmv = gmvDf
         .withColumn("platform", platform)
-        .withColumn("country", country)
-        .withColumn("recall_pool", recallPool)
-        .withColumn("is_single", single)
-        .groupBy("event_time", "platform", "country", "recall_pool", "is_single")
+        .withColumn("recall_name", recallName)
+        .filter($"recall_name" =!= "no_matched")
+        .groupBy("event_time", "platform", "recall_name", "is_single")
         .agg(
           F.sum("order_goods_gmv").alias("gmv").alias("gmv")
         )
       val data = ctr
-        .join(homePage, Seq("event_time", "platform", "country"), "left")
-        .join(pdSuccess, Seq("event_time", "platform", "country", "recall_pool", "is_single"), "left")
-        .join(gmv, Seq("event_time", "platform", "country", "recall_pool", "is_single"), "left")
+        .join(homePage, Seq("event_time", "platform"), "left")
+        .join(pdSuccess, Seq("event_time", "platform", "recall_name", "is_single"), "left")
+        .join(gmv, Seq("event_time", "platform", "recall_name", "is_single"), "left")
         .select(
           $"event_time",
           $"platform",
-          $"country",
-          $"recall_pool",
+          $"recall_name",
           $"is_single",
           F.coalesce($"recall_times", F.lit(0)).alias("recall_times"),
           F.coalesce($"clicks", F.lit(0)).alias("clicks"),
@@ -270,33 +258,25 @@ object RecallPoolReport {
           F.coalesce($"gmv", F.lit(0.00)).alias("gmv")
         )
         .cache()
-      for (i <- 0 to 8) {
-        val data1 = data
-          .withColumn("recall_name", recallName($"recall_pool", F.lit(i)))
-          .filter($"recall_name" =!= "no_matched" && $"recall_pool" =!= "all")
-          .withColumnRenamed("country", "region_code")
-        if (!data1.isEmpty) {
-          data1.show(false)
-          reportDb.insertPure("recall_pool_report", data1, spark)
-        }
-      }
+      data.show(false)
+      reportDb.insertPure("recall_pool_report", data, spark)
     }
   }
 
-  def main(args: Array[String]): Unit = {
-    val reportDb = new DataSource("themis_report_write")
-    reportDb.execute(dropTable)
-    reportDb.execute(createTable)
+  def initSpark: SparkSession = {
     val appName = "recall_pool"
-//    println(appName)
-//    val spark = SparkSession.builder
-//      .appName("recall_pool")
-//      .master("local[*]")
-//      .config("spark.sql.session.timeZone", "UTC")
-//      .getOrCreate()
-//    spark.sparkContext.setLogLevel("WARN")
-//    val dateFormat = DateTimeFormatter.ofPattern("yyyy/MM/dd")
-//    val (start, end) = (LocalDate.parse(args(0), dateFormat), LocalDate.parse(args(1), dateFormat))
+    System.getenv("BUILD_ENV") match {
+      case "local" => {
+        println(appName)
+        val spark = SparkSession.builder
+          .appName("recall_pool")
+          .master("local[*]")
+          .config("spark.sql.session.timeZone", "UTC")
+          .getOrCreate()
+        spark.sparkContext.setLogLevel("WARN")
+        spark
+      }
+      case _ => {
         val spark = SparkSession.builder
           .master("yarn")
           .appName(appName)
@@ -306,9 +286,18 @@ object RecallPoolReport {
           .getOrCreate()
         spark.sparkContext.setLogLevel("WARN")
         spark.sparkContext.setCheckpointDir("s3://vomkt-emr-rec/checkpoint/")
+        spark
+      }
+    }
+  }
 
-        val dateFormat = DateTimeFormatter.ofPattern("yyyy/MM/dd")
-        var (start, end) = (LocalDate.parse(args(0), dateFormat), LocalDate.parse(args(1), dateFormat))
+  def main(args: Array[String]): Unit = {
+//    val reportDb = new DataSource("themis_report_write")
+//    reportDb.execute(dropTable)
+//    reportDb.execute(createTable)
+    val spark = initSpark
+    val dateFormat = DateTimeFormatter.ofPattern("yyyy/MM/dd")
+    var (start, end) = (LocalDate.parse(args(0), dateFormat), LocalDate.parse(args(1), dateFormat))
     transform(start.format(dateFormat), spark)
   }
 }

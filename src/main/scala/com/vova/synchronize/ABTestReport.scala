@@ -138,7 +138,7 @@ object ABTestReport {
 
 
       val hit = rawData
-        .filter($"os_family".isin("android", "ios"))
+        .filter($"os".isin("android", "ios"))
         .select("event_name", "element_name", "country", "os", "page_code", "url", "device_id", "cur_day")
         .withColumnRenamed("country", "region_code")
         .withColumnRenamed("os", "platform")
@@ -152,7 +152,7 @@ object ABTestReport {
            |SELECT oi.order_id,
            |       oi.order_time,
            |       oi.goods_amount + oi.shipping_fee AS gmv,
-           |       oi.country                        AS region_code,
+           |       r.region_code                     AS region_code,
            |       CASE
            |           WHEN oi.device_type = 11 THEN 'ios'
            |           WHEN oi.device_type = 12 THEN 'android'
@@ -162,10 +162,11 @@ object ABTestReport {
            |       oi.device_id,
            |       oi.pay_time
            |FROM order_info oi
+           |         INNER JOIN region r ON r.region_id = oi.country
            |WHERE oi.order_time >= '$startS'
            |  AND oi.order_time < '$endS'
            |  AND oi.parent_order_id = 0
-        """.stripMargin
+         """.stripMargin
 
       val oiRaw = reportDb
         .load(spark, orderInfo)
@@ -302,8 +303,6 @@ object ABTestReport {
             F.coalesce($"gmv", F.lit(0.00)).alias("gmv")
           )
           .cache()
-
-        finalData.show()
 
         reportDb.insertPure("ab_report", finalData, spark)
       }
