@@ -47,11 +47,10 @@ object PageCohort {
       .withColumn("cur_day", F.to_date($"derived_ts"))
   }
 
-  def preFilter(data: DataFrame, pageCode: (String, String), regionCode: Column, platform: Column): DataFrame = {
+  def preFilter(data: DataFrame, pageCode: (String, String),  platform: Column): DataFrame = {
     data
       .where(pageCode._2)
       .withColumn("page_code", F.lit(pageCode._1))
-      .withColumn("region_code", regionCode)
       .withColumn("platform", platform)
   }
 
@@ -95,11 +94,6 @@ object PageCohort {
           loadBatchData("hit/" + start.plusDays(7).format(dateFormat), spark)
         else dau.limit(1)
       }.select("device_id")
-      val next_28 = {
-        if (start.plusDays(28).compareTo(LocalDate.now()) < 0)
-          loadBatchData("hit/" + start.plusDays(28).format(dateFormat), spark)
-        else dau.limit(1)
-      }.select("device_id")
 
       //需要计算的page_code
       val pageCodes = List(
@@ -110,11 +104,10 @@ object PageCohort {
       for {
         pageCode <- pageCodes
         platform <- List(F.col("platform"), F.lit("all"))
-        regionCode <- List(F.col("region_code"), F.lit("all"))
       } {
-        val dauDf = preFilter(dau, pageCode, regionCode, platform)
+        val dauDf = preFilter(dau, pageCode,  platform)
         val cohort_0 = dauDf
-          .groupBy("cur_day", "region_code", "platform", "page_code")
+          .groupBy("cur_day",  "platform", "page_code")
           .agg(
             F.approx_count_distinct("device_id").alias("dau")
           )
@@ -138,18 +131,11 @@ object PageCohort {
           .agg(
             F.approx_count_distinct("device_id").alias("next_7")
           )
-        val cohort_28 = dauDf
-          .join(next_28, "device_id")
-          .groupBy("cur_day", "region_code", "platform", "page_code")
-          .agg(
-            F.approx_count_distinct("device_id").alias("next_28")
-          )
 
         val dataFinal = cohort_0
           .join(cohort_1, Seq("cur_day", "region_code", "platform", "page_code"), "left")
           .join(cohort_3, Seq("cur_day", "region_code", "platform", "page_code"), "left")
           .join(cohort_7, Seq("cur_day", "region_code", "platform", "page_code"), "left")
-          .join(cohort_28, Seq("cur_day", "region_code", "platform", "page_code"), "left")
           .select(
             F.coalesce($"cur_day", F.lit("0000-00-00")).alias("cur_day"),
             F.coalesce($"region_code", F.lit("")).alias("region_code"),
@@ -158,8 +144,7 @@ object PageCohort {
             F.coalesce($"dau", F.lit(0)).alias("dau"),
             F.coalesce($"next_1", F.lit(0)).alias("next_1"),
             F.coalesce($"next_3", F.lit(0)).alias("next_3"),
-            F.coalesce($"next_7", F.lit(0)).alias("next_7"),
-            F.coalesce($"next_28", F.lit(0)).alias("next_28")
+            F.coalesce($"next_7", F.lit(0)).alias("next_7")
           )
           .cache()
 

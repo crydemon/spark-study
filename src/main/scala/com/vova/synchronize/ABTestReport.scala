@@ -75,10 +75,12 @@ object ABTestReport {
   def main(args: Array[String]): Unit = {
 
     val reportDb = new DataSource("themis_report_write")
-//    reportDb.execute(dropABDevicesTable)
-//    reportDb.execute(createABDevicesTable)
-//    reportDb.execute(dropTable)
-//    reportDb.execute(createTable)
+    val sql = "DELETE FROM ab_devices WHERE test_version = ''"
+    reportDb.execute(sql)
+    //    reportDb.execute(dropABDevicesTable)
+    //    reportDb.execute(createABDevicesTable)
+    //    reportDb.execute(dropTable)
+    //    reportDb.execute(createTable)
 
 
     val appName = "ab_report"
@@ -121,10 +123,11 @@ object ABTestReport {
       val rawABDevices = rawData
         .filter($"test_name".isNotNull)
         .filter($"device_id".isNotNull)
-        .filter($"test_version".isNotNull)
+        .filter($"test_version".isNotNull and ($"test_version" =!= ""))
         .filter($"event_name" === "test_create")
         .filter($"test_name".isin(needCollectTestNames))
         .select("device_id", "os", "test_name", "test_version", "app_version")
+        .filter($"os" === "android" && $"app_version" =!= "2.34.0")
         .withColumnRenamed("os", "platform")
         .distinct()
 
@@ -139,6 +142,7 @@ object ABTestReport {
 
       val hit = rawData
         .filter($"os".isin("android", "ios"))
+        .where("page_code not in('h5flashsale', 'luckystar', 'auction_auctionhouse')")
         .select("event_name", "element_name", "country", "os", "page_code", "url", "device_id", "cur_day")
         .withColumnRenamed("country", "region_code")
         .withColumnRenamed("os", "platform")

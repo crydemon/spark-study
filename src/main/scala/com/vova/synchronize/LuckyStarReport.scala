@@ -82,7 +82,6 @@ object LuckyStarReport {
     val themisDb = new DataSource("themis_read")
     themisDb.load(spark, newOrder)
       .write
-      .option("header", "true")
       .mode(SaveMode.Overwrite)
       .parquet(basePath + "order_info/")
 
@@ -95,21 +94,21 @@ object LuckyStarReport {
 
     spark.read
       .option("header", "true")
-      .csv("D:\\click_push_csv\\")
+      .parquet(basePath + "click_push/")
       .withColumn("push_time", F.regexp_replace($"push_time".substr(0, 19), "T", " "))
       .withColumn("event_time", F.regexp_replace($"event_time".substr(0, 19), "T", " "))
       .createOrReplaceTempView("click_push")
 
     spark.read
       .option("header", "true")
-      .csv("d:/try_push_csv/")
+      .parquet(basePath + "try_push/")
       .withColumn("push_time", F.regexp_replace($"push_time".substr(0, 19), "T", " "))
       .createOrReplaceTempView("try_push")
 
 
     spark.read
       .option("header", "true")
-      .csv("D:\\order_info_csv")
+      .parquet(basePath + "order_info/")
       .withColumn("order_time", F.regexp_replace($"order_time".substr(0, 19), "T", " "))
       .withColumn("pay_time", F.regexp_replace($"pay_time".substr(0, 19), "T", " "))
       .createOrReplaceTempView("order_info")

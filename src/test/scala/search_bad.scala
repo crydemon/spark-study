@@ -18,7 +18,7 @@ object search_bad {
     spark.sparkContext.setLogLevel("WARN")
     import spark.implicits._
 
-    val data = spark.read.json("E:\\eks\\vomkt-evt\\enrich-good\\2019\\07\\06\\19\\*.gz")
+    val data = spark.read.json("E:\\eks\\vomkt-evt\\enrich-bad\\2019\\07\\29\\04\\*.gz")
 
     data.show(1000, false)
 
@@ -82,7 +82,7 @@ object testBase64 {
     spark.sparkContext.setLogLevel("WARN")
     import spark.implicits._
 
-    val data = spark.read.textFile("E:\\eks\\vomkt-evt\\enrich-good\\2019\\07\\06\\19\\*.gz")
+    val data = spark.read.textFile("E:\\eks\\vomkt-evt\\enrich-good\\2019\\07\\29\\04\\*.gz")
 
     data.show(1000, false)
 

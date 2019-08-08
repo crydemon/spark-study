@@ -181,10 +181,11 @@ object RecallPoolReport {
       .withColumn("event_time", F.from_unixtime($"timestamp", "yyyy-MM-dd HH:00:00"))
       .withColumn("recall_pool", $"last_recall_pool")
       .withColumn("is_single", recallType($"recall_pool"))
+      .cache()
 
 
-    gmvDf.show(false)
     val rawGoodsCtr = loadBatchProcessed("goods_ctr_v2/" + path, spark)
+      .filter($"page_code" === "homepage")
       .filter($"recall_pool".isNotNull)
       .filter($"os_type".isin("android", "ios"))
       .select("recall_pool", "goods_id", "impressions", "clicks", "user_unique_id", "os_type", "derived_ts")
@@ -194,11 +195,12 @@ object RecallPoolReport {
       .withColumn("event_time", F.date_format($"event_time", "yyyy-MM-dd HH:00:00"))
       .withColumnRenamed("user_unique_id", "user_id")
       .filter(F.length($"recall_pool") > 0)
+      .cache()
 
-    rawGoodsCtr.show(false)
     val reportDb = new DataSource("themis_report_write")
     for {
       platform <- List(F.lit("all"), F.col("platform"))
+      isSingle <- List(F.lit("all"), F.col("is_single"))
       i <- 0 to 10
       recallName <- List(F.lit("all"), recallName($"recall_pool", F.lit(i)))
     } {
@@ -206,6 +208,7 @@ object RecallPoolReport {
         .withColumn("platform", platform)
         .withColumn("recall_name", recallName)
         .filter($"recall_name" =!= "no_matched")
+        .withColumn("is_single", isSingle)
         .groupBy("event_time", "platform", "recall_name", "is_single")
         .agg(
           F.sum($"impressions").alias("impressions"),
@@ -220,7 +223,6 @@ object RecallPoolReport {
           F.count(F.lit(1)).alias("recall_times")
         )
 
-      homePage.show(false)
 
       val pdSuccess = rawHit
         .filter($"element_name" === "pdAddToCartSuccess")
@@ -229,6 +231,7 @@ object RecallPoolReport {
         .withColumn("platform", platform)
         .withColumn("recall_name", recallName)
         .filter($"recall_name" =!= "no_matched")
+        .withColumn("is_single", isSingle)
         .groupBy("event_time", "platform", "recall_name", "is_single")
         .agg(
           F.count(F.lit(1)).alias("add_to_bag_success")
@@ -238,6 +241,7 @@ object RecallPoolReport {
         .withColumn("platform", platform)
         .withColumn("recall_name", recallName)
         .filter($"recall_name" =!= "no_matched")
+        .withColumn("is_single", isSingle)
         .groupBy("event_time", "platform", "recall_name", "is_single")
         .agg(
           F.sum("order_goods_gmv").alias("gmv").alias("gmv")
@@ -258,7 +262,6 @@ object RecallPoolReport {
           F.coalesce($"gmv", F.lit(0.00)).alias("gmv")
         )
         .cache()
-      data.show(false)
       reportDb.insertPure("recall_pool_report", data, spark)
     }
   }
@@ -292,9 +295,9 @@ object RecallPoolReport {
   }
 
   def main(args: Array[String]): Unit = {
-//    val reportDb = new DataSource("themis_report_write")
-//    reportDb.execute(dropTable)
-//    reportDb.execute(createTable)
+    //    val reportDb = new DataSource("themis_report_write")
+    //    reportDb.execute(dropTable)
+    //    reportDb.execute(createTable)
     val spark = initSpark
     val dateFormat = DateTimeFormatter.ofPattern("yyyy/MM/dd")
     var (start, end) = (LocalDate.parse(args(0), dateFormat), LocalDate.parse(args(1), dateFormat))

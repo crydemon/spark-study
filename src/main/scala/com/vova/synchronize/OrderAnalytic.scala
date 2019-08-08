@@ -9,6 +9,8 @@ import com.vova.db.DataSource
 import org.apache.spark.sql.expressions.Window
 import org.apache.spark.sql.{DataFrame, Dataset, SparkSession, functions => F}
 
+import scala.util.Try
+
 object CauseAnaliticEventType {
   val goods_click = 0
   val place_order = 1
@@ -118,22 +120,9 @@ object OrderAnalytic {
       val page_code = row.getAs[String]("page_code")
       val list_type = row.getAs[String]("list_type")
       val list_uri = row.getAs[String]("list_uri")
-      val pattern = Pattern.compile("goods_id=(\\d+)")
-      val virtualPattern = Pattern.compile("virtual_goods_id=(\\d+)")
       event_name match {
         case "goods_click" => {
-          val url = row.getAs[String]("url")
-          var matcher = pattern.matcher(url)
-          var goods_id = -1
-          if (matcher.find()) {
-            goods_id = matcher.group(1).toInt
-          } else {
-            matcher = pattern.matcher(url)
-            matcher = virtualPattern.matcher(url)
-            if (matcher.find()) {
-              goods_id = matcher.group(1).toInt
-            }
-          }
+          val goods_id =  Try(row.getAs[String]("goods_id").toInt).getOrElse(-1)
           if (goods_id <= 0) {
             None
           } else {
@@ -160,18 +149,7 @@ object OrderAnalytic {
           }
         }
         case "common_click" => {
-          val url = row.getAs[String]("url")
-          var matcher = pattern.matcher(url)
-          var goods_id = -1
-          if (matcher.find()) {
-            goods_id = matcher.group(1).toInt
-          } else {
-            matcher = pattern.matcher(url)
-            matcher = virtualPattern.matcher(url)
-            if (matcher.find()) {
-              goods_id = matcher.group(1).toInt
-            }
-          }
+          val goods_id = Try(row.getAs[String]("element_id").toInt).getOrElse(-1)
           val element_name = row.getAs[String]("element_name")
           if (goods_id <= 0 || element_name != "pdAddToCartSuccess") {
             None
