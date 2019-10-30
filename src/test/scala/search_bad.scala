@@ -18,7 +18,7 @@ object search_bad {
     spark.sparkContext.setLogLevel("WARN")
     import spark.implicits._
 
-    val data = spark.read.json("E:\\eks\\vomkt-evt\\enrich-bad\\2019\\07\\29\\04\\*.gz")
+    val data = spark.read.json("E:\\eks\\vomkt-evt\\enrich-bad\\2019\\09\\17\\19\\*.gz")
 
     data.show(1000, false)
 
