@@ -3,7 +3,8 @@ package qwang
 import java.util.TimeZone
 
 import org.apache.spark.HashPartitioner
-import org.apache.spark.sql.SparkSession
+import org.apache.spark.sql.expressions.Window
+import org.apache.spark.sql.{SaveMode, SparkSession, functions => F}
 
 object SparkUtils {
 
@@ -67,6 +68,7 @@ object ZipOp extends App {
   val radd2 = spark.range(4, 7, 1).rdd
   val radd3 = spark.range(7, 10, 1).rdd
 
+
   (radd1 zip radd2 zip radd3).toDF()
   //.show(false)
   radd3.zipWithIndex().toDF()
@@ -115,4 +117,21 @@ object ZipOp extends App {
   spark.createDataFrame(avgScoresRdd).show()
   var avgScores = avgScoresRdd.map { case (key, value) => (key, value._1 / value._2.toFloat) } //.map(x=>(x,(x._1/x._2))
   Thread.sleep(1000000)
+}
+
+object WindowTest extends App {
+  val spark = SparkUtils.initSpark("windowTest")
+
+  import spark.implicits._
+
+  val sampleData = Seq(("bob", "Developer", 0), ("bob", "Developer", 125002), ("bob", "Developer", 12002), ("mark", "Developer", 108000), ("carl", "Tester", 70000), ("peter", "Developer", 185000), ("jon", "Tester", 65000), ("roman", "Tester", 82000), ("simon", "Developer", 98000), ("eric", "Developer", 144000), ("carlos", "Tester", 75000), ("henry", "Developer", 110000)).toDF("Name", "Role", "Salary")
+
+  sampleData.orderBy("Name", "Role").show(false)
+  val window = Window.partitionBy("Name", "Role").orderBy("Salary")
+  sampleData
+    .withColumn("first_val", F.first("Salary", true).over(window))
+    .withColumn("last_val", F.last("Salary", true).over(window))
+    .withColumn("col_last_val", F.coalesce($"Salary", F.last("Salary", true).over(window)))
+    .orderBy("Name", "Role")
+    .show(false)
 }
