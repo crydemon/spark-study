@@ -1,5 +1,5 @@
 
-name := "report-1.0"
+name := "spark-study"
 
 version := "0.1"
 
@@ -13,9 +13,6 @@ libraryDependencies ++= Seq(
 libraryDependencies += "com.typesafe" % "config" % "1.3.2"
 
 libraryDependencies ++= Seq(
-  "org.apache.hadoop" % "hadoop-aws" % "3.1.2",
-  "org.apache.hadoop" % "hadoop-hdfs" % "3.1.2",
-  "org.apache.hadoop" % "hadoop-common" % "3.1.2",
   "com.fasterxml.jackson.core" % "jackson-core" % "2.9.8",
   "com.fasterxml.jackson.core" % "jackson-databind" % "2.9.8",
   "com.fasterxml.jackson.module" %% "jackson-module-scala" % "2.9.8"
