@@ -119,19 +119,34 @@ object ZipOp extends App {
   Thread.sleep(1000000)
 }
 
+object export extends App {
+  val spark = SparkUtils.initSpark("windowTest")
+
+}
+
 object WindowTest extends App {
   val spark = SparkUtils.initSpark("windowTest")
 
   import spark.implicits._
 
-  val sampleData = Seq(("bob", "Developer", 0), ("bob", "Developer", 125002), ("bob", "Developer", 12002), ("mark", "Developer", 108000), ("carl", "Tester", 70000), ("peter", "Developer", 185000), ("jon", "Tester", 65000), ("roman", "Tester", 82000), ("simon", "Developer", 98000), ("eric", "Developer", 144000), ("carlos", "Tester", 75000), ("henry", "Developer", 110000)).toDF("Name", "Role", "Salary")
+  val sampleData = Seq(("bob", "M_2", 0) , ("bob", "F_1", 123), ("bob", "R_1", 125002), ("bob", "Developer", 12002), ("mark", "Developer", 108000), ("carl", "Tester", 70000), ("peter", "Developer", 185000), ("jon", "Tester", 65000), ("roman", "Tester", 82000), ("simon", "Developer", 98000), ("eric", "Developer", 144000), ("carlos", "Tester", 75000), ("henry", "Developer", 110000)).toDF("name", "role", "salary")
 
-  sampleData.orderBy("Name", "Role").show(false)
-  val window = Window.partitionBy("Name", "Role").orderBy("Salary")
-  sampleData
-    .withColumn("first_val", F.first("Salary", true).over(window))
-    .withColumn("last_val", F.last("Salary", true).over(window))
-    .withColumn("col_last_val", F.coalesce($"Salary", F.last("Salary", true).over(window)))
-    .orderBy("Name", "Role")
+  sampleData.createTempView("tt")
+  val data = spark.sql("select name, concat_ws(',', collect_set(role)) as cs from tt group by name")
+  data.printSchema()
+  data.show(false)
+  data.withColumn("ext", F.regexp_extract($"cs", "M_(\\d+)", 0))
     .show(false)
+
+
+  //  sampleData.orderBy("Name", "Role").show(false)
+  //  val window = Window.partitionBy("Name", "Role").orderBy("Salary")
+  //  sampleData
+  //    .withColumn("first_val", F.first("Salary", true).over(window))
+  //    .withColumn("last_val", F.last("Salary", true).over(window))
+  //    .withColumn("col_last_val", F.coalesce($"Salary", F.last("Salary", true).over(window)))
+  //    .orderBy("Name", "Role")
+  //    .show(false)
+
+
 }
