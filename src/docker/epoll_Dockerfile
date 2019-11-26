@@ -1,0 +1,8 @@
+FROM java:8
+MAINTAINER bingwenwuhen bingwenwuhen@163.com
+
+RUN mkdir /app
+COPY target/epoll-server-1.0-SNAPSHOT.jar /app
+
+ENTRYPOINT ["java", "-jar", "app/epoll-server-1.0-SNAPSHOT.jar"]
+EXPOSE 8080
