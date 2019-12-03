@@ -1,8 +1,8 @@
-package thinks
+package thinks.scala
 
-import scala.concurrent.{Await, Future}
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration.Duration
+import scala.concurrent.{Await, Future}
 import scala.util.{Failure, Success}
 
 object ThinkImplicit1 extends App {

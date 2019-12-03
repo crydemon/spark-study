@@ -7,7 +7,6 @@ import org.apache.spark.sql.SparkSession
 object util {
   def initSpark(appName: String): SparkSession = {
     println(appName)
-    println("gg")
     val spark = SparkSession.builder()
       .appName(appName)
       .master("local[6]")
