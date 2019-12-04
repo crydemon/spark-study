@@ -4,6 +4,7 @@ import org.apache.spark.ml.{Pipeline, PipelineModel}
 import org.apache.spark.ml.classification.{DecisionTreeClassifier, RandomForestClassificationModel, RandomForestClassifier}
 import org.apache.spark.ml.evaluation.MulticlassClassificationEvaluator
 import org.apache.spark.ml.feature.{VectorAssembler, VectorIndexer}
+import org.apache.spark.ml.linalg.SparseVector
 import org.apache.spark.ml.tuning.{ParamGridBuilder, TrainValidationSplit}
 import org.apache.spark.mllib.evaluation.MulticlassMetrics
 import org.apache.spark.mllib.linalg.DenseVector
@@ -44,8 +45,18 @@ object ch4_rdf {
     val Array(trainData, testData) = data.randomSplit(Array(0.9, 0.1))
     val rdf = new RunRDF(spark)
     rdf.simpleDecisionTree(trainData, testData)
-    println("---------------------random classifier------------------")
+    println("---------------------random randomClassifier------------------")
     rdf.randomClassifier(trainData, testData)
+
+    println("---------------------普通决策树------------------")
+    rdf.evaluate(trainData, testData)
+    println("---------------------categorical------------------")
+    rdf.evaluateCategorical(trainData, testData)
+    println("---------------------random rdf------------------")
+    rdf.evaluateForest(trainData, testData)
+
+    trainData.unpersist()
+    testData.unpersist()
   }
 }
 
@@ -85,6 +96,7 @@ class RunRDF(private val spark: SparkSession) {
     val predictions = model.transform(assembledTrainData)
 
 
+    predictions.printSchema()
     predictions.select("Cover_Type", "prediction", "probability").
       show(truncate = false)
 
@@ -152,6 +164,7 @@ class RunRDF(private val spark: SparkSession) {
       addGrid(classifier.impurity, Seq("gini", "entropy")).
     //树的最大深度
       addGrid(classifier.maxDepth, Seq(1, 20)).
+      //maxbin（=32）至少与每个分类特征中的值的数目一样大
       addGrid(classifier.maxBins, Seq(40, 300)).
       addGrid(classifier.minInfoGain, Seq(0.0, 0.05)).
       build()
@@ -196,8 +209,8 @@ class RunRDF(private val spark: SparkSession) {
     val wildernessAssembler = new VectorAssembler().
       setInputCols(wildernessCols).
       setOutputCol("wilderness")
-
-    val unhotUDF = udf((vec: DenseVector) => vec.toArray.indexOf(1.0).toDouble)
+    import org.apache.spark.ml.linalg.Vectors
+    val unhotUDF = udf((vec: SparseVector) => vec.toArray.indexOf(1.0).toDouble)
 
     val withWilderness = wildernessAssembler.transform(data).
       drop(wildernessCols: _*).
