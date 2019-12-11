@@ -14,7 +14,7 @@ object util {
       .config("spark.default.parallelism", "18")
       .config("spark.cores.max", "6")
       .getOrCreate()
-    spark.sparkContext.setLogLevel("INFO")
+    spark.sparkContext.setLogLevel("WARN")
     spark
   }
 
