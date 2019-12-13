@@ -41,6 +41,8 @@ libraryDependencies += "com.squareup.okhttp3" % "okhttp" % "3.14.2"
 
 
 
+// https://mvnrepository.com/artifact/com.alibaba/druid
+libraryDependencies += "com.alibaba" % "druid" % "1.1.21"
 
 
 
