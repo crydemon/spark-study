@@ -18,6 +18,8 @@ import org.apache.spark.sql.SparkSession
 object CorrelationExample {
 
   def main(args: Array[String]): Unit = {
+    println(70934149 % 16)
+
     val spark = utils.util.initSpark("rdf")
     import spark.implicits._
 
