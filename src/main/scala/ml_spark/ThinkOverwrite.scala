@@ -30,17 +30,28 @@ object ThinkOverwrite extends App {
 //    (5, 501, 534, "2017-11-15", "joy", 243.2),
 //    (7, 701, 734, "2011-08-14", "joy", 243.2)
 //  ).toDF("cat_id", "goods_id", "pay_date", "user_id", "user_name", "gmv")
-
+//
 //  df.write
+//    .mode("overwrite")
 //    .option("header", "true")
 //    .csv("D:\\datas\\test")
 
   //确实可以覆盖
-  val df = spark.read .option("header", "true")
+  val df1 = spark.read.option("header", "true")
     .csv("D:\\datas\\test")
-      .cache()
-  println(df.count())
-  df.write.mode("overwrite").csv("d:\\datas\\test")
+    .cache()
+  println(df1.count())
+
+
+  df1
+    .select("goods_id")
+    .groupBy("goods_id")
+    .count()
+    .coalesce(1)
+    .write
+    .option("header", "true")
+    .mode("overwrite")
+    .csv("d:\\datas\\test")
   //
   //  val df1 =  Seq(
   //    (234,  "2019-10-18", 1, "17.14.59.7"),
