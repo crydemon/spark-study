@@ -20,6 +20,7 @@ public class AVLTree {
     }
 
     public boolean insert(int key) {
+        //第一个节点作为root
         if (root == null) {
             root = new Node(key, null);
             return true;
@@ -27,7 +28,6 @@ public class AVLTree {
         Node n = root;
         Node parent;
         while (true) {
-
             if (n.key == key) {
                 //所有的节点的key不同
                 return false;
@@ -42,6 +42,7 @@ public class AVLTree {
                 } else {
                     parent.right = new Node(key, parent);
                 }
+                //谁的儿子谁负责
                 reBalance(parent);
                 break;
             }
@@ -51,6 +52,7 @@ public class AVLTree {
 
     private void reBalance(Node n) {
         setBalance(n);
+        System.out.println("balance:" + n.balance);
         if (n.balance == -2) {
             if (height(n.left.left) >= height(n.left.right)) {
                 n = rotateRight(n);
@@ -65,6 +67,7 @@ public class AVLTree {
             }
         }
         if (n.parent != null) {
+            System.out.println("n.parent: " + n.parent.key);
             reBalance(n.parent);
         } else {
             root = n;
@@ -106,7 +109,58 @@ public class AVLTree {
         return arrange(a, b);
     }
 
+    private void delete(Node node) {
+        //为叶子节点
+        if (node.left == null && node.right == null) {
+            //只有一个节点
+            if (node.parent == null) {
+                root = null;
+            } else {
+                Node parent = node.parent;
+                if (parent.left == node) {
+                    parent.left = null;
+                } else {
+                    parent.right = null;
+                }
+                reBalance(parent);
+            }
+            //左子树不为空
+        } else if (node.left != null) {
+            Node child = node.left;
+            //找到左子树最大
+            while (child.right != null) {
+                child = child.right;
+            }
+            node.key = child.key;
+            delete(child);
+            //右子树不为空
+        } else {
+            Node child = node.right;
+            //找到右子树最小
+            while (child.left != null) {
+                child = child.left;
+            }
+            node.key = child.key;
+            delete(child);
+        }
+    }
+
+    public void delete(int delKey) {
+        if (root == null) return;
+        Node node = root;
+        Node child = root;
+        while (child != null) {
+            node = child;
+            child = delKey >= node.key ? node.right : node.left;
+            if (delKey == node.key) {
+                delete(node);
+                return;
+            }
+        }
+    }
+
     private Node arrange(Node a, Node b) {
+        System.out.println("arrange");
         a.parent = b;
 
         if (b.parent != null) {
@@ -146,7 +200,8 @@ public class AVLTree {
     private void printBalance(Node n) {
         if (n != null) {
             printBalance(n.left);
-            System.out.printf("%s ", n.balance);
+            //System.out.printf("%s ", n.balance);
+            System.out.printf("%s, %s|", n.key, n.height);
             printBalance(n.right);
         }
     }
@@ -154,9 +209,12 @@ public class AVLTree {
     public static void main(String[] args) {
         AVLTree tree = new AVLTree();
 
-        System.out.println("Inserting values 1 to 10");
-        for (int i = 1; i <= 10; i++)
+        System.out.println("Inserting values 1 to 100");
+        for (int i = 1; i <= 5; i++) {
+            System.out.println(i + "---------------------------");
             tree.insert(i);
+        }
+
 
         System.out.print("Printing balance: ");
         tree.printBalance();
