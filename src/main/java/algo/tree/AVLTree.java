@@ -224,11 +224,10 @@ public class AVLTree {
 class TestReference {
     static class Node {
         int key;
-        Node next;
+        Node next = null;
 
         public Node(int key) {
             this.key = key;
-            this.next = null;
         }
 
         @Override

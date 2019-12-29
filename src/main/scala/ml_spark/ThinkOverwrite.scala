@@ -1,6 +1,6 @@
 package ml_spark
 
-import org.apache.spark.sql.functions
+import org.apache.spark.sql.{Row, functions}
 import utils.util.initSpark
 
 import scala.util.Try
@@ -42,16 +42,17 @@ object ThinkOverwrite extends App {
     .cache()
   println(df1.count())
 
+  import spark.implicits._
+  df1.rdd
+    .map(x=>(x.getInt(0), 1))
+    .reduceByKey((x, y)  => x+ y)
+    .count()
 
   df1
     .select("goods_id")
     .groupBy("goods_id")
     .count()
-    .coalesce(1)
-    .write
-    .option("header", "true")
-    .mode("overwrite")
-    .csv("d:\\datas\\test")
+    .show(false)
   //
   //  val df1 =  Seq(
   //    (234,  "2019-10-18", 1, "17.14.59.7"),
