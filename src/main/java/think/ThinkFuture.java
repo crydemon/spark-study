@@ -1,9 +1,11 @@
+package think;
+
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.Callable;
 import java.util.concurrent.FutureTask;
 
-public class StudyFuture {
+public class ThinkFuture {
 
     private static final FutureTask<Integer> future = new FutureTask<>(new CallableTest());
 
@@ -39,6 +41,7 @@ public class StudyFuture {
 class A{
     String s;
 }
+
 class B {
     public List<A> getList() {
         return list;
@@ -53,6 +56,7 @@ class B {
         list = new ArrayList<>();
     }
 }
+
 class Test1 {
     public static void main(String[] args) {
         List<A> list = new B().getList();

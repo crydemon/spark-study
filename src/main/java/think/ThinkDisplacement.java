@@ -1,3 +1,5 @@
+package think;
+
 public class ThinkDisplacement {
 
     public static void main(String[] args) {
