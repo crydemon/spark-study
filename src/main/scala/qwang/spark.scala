@@ -29,6 +29,7 @@ object SparkUtils {
 object SparkGroupByKey extends App {
   val words = Array("one", "two", "two", "three", "three", "three")
   val spark = SparkUtils.initSpark("groupByKey")
+  spark.sparkContext.getConf.getOption("spark.speculation")
   val wordPairsRDD = spark.sparkContext.parallelize(words).map(word => (word, 1))
   //group
   //This operation may be very expensive
