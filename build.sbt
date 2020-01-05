@@ -44,5 +44,8 @@ libraryDependencies += "com.squareup.okhttp3" % "okhttp" % "3.14.2"
 // https://mvnrepository.com/artifact/com.alibaba/druid
 libraryDependencies += "com.alibaba" % "druid" % "1.1.21"
 
+// https://mvnrepository.com/artifact/org.apache.kafka/kafka-clients
+libraryDependencies += "org.apache.kafka" % "kafka-clients" % "2.4.0"
 
-
+// https://mvnrepository.com/artifact/org.apache.spark/spark-sql-kafka-0-10
+libraryDependencies += "org.apache.spark" %% "spark-sql-kafka-0-10" % "2.4.4"
