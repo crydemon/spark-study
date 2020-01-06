@@ -1,15 +1,82 @@
 package kfk
 
+import java.sql.{Connection, DriverManager}
 import java.util.{Collections, Properties}
 
-import org.apache.kafka.clients.consumer.{ConsumerRecords, KafkaConsumer}
+import org.apache.kafka.clients.consumer.KafkaConsumer
 import org.apache.kafka.clients.producer.{KafkaProducer, ProducerRecord, RecordMetadata}
+import org.apache.spark.sql.execution.streaming.Sink
+import org.apache.spark.sql.sources.{DataSourceRegister, StreamSinkProvider}
+import org.apache.spark.sql.streaming.OutputMode
+import org.apache.spark.sql.{DataFrame, ForeachWriter, Row, SQLContext}
+
+//class MySQLSink(options: Map[String, String], outputMode: OutputMode) extends Sink {
+//
+//  override def addBatch(batchId: Long, data: DataFrame): Unit = {
+//    /** 从option参数中获取需要的参数 **/
+//    val userName = options.get("userName").orNull
+//    val password = options.get("password").orNull
+//    val table = options.get("table").orNull
+//    val jdbcUrl = options.get("jdbcUrl").orNull
+//    //data.show()
+//    //println(userName+"---"+password+"---"+jdbcUrl)
+//    val pro = new Properties
+//    pro.setProperty("user", userName)
+//    pro.setProperty("password", password)
+//    data.write.mode(outputMode.toString).jdbc(jdbcUrl, table, pro)
+//  }
+//}
+//
+//class MySQLStreamSinkProvider extends StreamSinkProvider with DataSourceRegister {
+//
+//  override def createSink(sqlContext: SQLContext,
+//                          parameters: Map[String, String],
+//                          partitionColumns: Seq[String],
+//                          outputMode: OutputMode): Sink = {
+//    new MySQLSink(parameters, outputMode);
+//  }
+//
+//  //此名称可以在.format中使用。
+//  override def shortName(): String = "mysql"
+//}
+
+
+/**
+ * 自定义mysqk组件
+ * @param url  输入database
+ * @param userName
+ * @param pwd
+ */
+class MysqlSink(url:String, userName:String, pwd:String) extends  ForeachWriter [Row]{
+  //创建连接对象
+  var conn:Connection = _
+  //建立连接
+  override def open(partitionId: Long, epochId: Long): Boolean = {
+    Class.forName("com.mysql.cj.jdbc.Driver")
+    conn=DriverManager.getConnection(url,userName,pwd)
+    true
+  }
+  //数据写入mysql
+  override def process(value: Row): Unit = {
+    //注意streamingout1(k,v,t)是在 mysql 指定database中自己所创建的表，(k,v,t)分别是自己创建的键值对
+    val p=conn.prepareStatement("insert into mysql_sink(id,val) values(?,?)")
+    p.setString(1,value(0).toString)
+    p.setString(2,value(1).toString)
+    p.execute()
+  }
+
+  override def close(errorOrNull: Throwable): Unit = {
+    conn.close()
+  }
+}
 
 
 object SparkConsumer extends App {
   // Subscribe to 1 topic
   val spark = utils.util.initSpark("kfk")
+
   import spark.implicits._
+
   val df = spark
     .readStream
     .format("kafka")
@@ -19,12 +86,21 @@ object SparkConsumer extends App {
 
 
   val read = df.selectExpr("CAST(key AS STRING)", "CAST(value AS STRING)")
-    .as[(String, String)]
+    .toDF("id", "val")
 
-  val query = read.writeStream.format("console").start()
+  //创建流式数据写入格式对象   //连接到名为Spark的database
+  val mysqlsink = new MysqlSink("jdbc:mysql://localhost:3306/test?serverTimezone=UTC","root","root")
+  //将处理好得数据重新写入到mysql中去
+  val query =  read.writeStream
+    .outputMode(OutputMode.Append())//聚合操作的显示必须要使用complete,非聚合要使用append
+    //检查点必须设置，不然会报错
+    .option("checkpointLocation", "d://checkpoint//mysql")//设置检查点
+    .foreach(mysqlsink)//输出到mysql
+    .start()
+  query.awaitTermination()
 
-  Thread.sleep(1000000000)
-  query.stop()
+
+  spark.streams.awaitAnyTermination()
 }
 
 object SimpleKfa {
@@ -34,7 +110,7 @@ object SimpleKfa {
     //consumer
   }
 
-  def product={
+  def product = {
     val prop = new Properties()
     prop.put("bootstrap.servers", "127.0.0.1:9092")
     prop.put("acks", "all")
@@ -53,7 +129,8 @@ object SimpleKfa {
 
     producer.close()
   }
-  def consumer ={
+
+  def consumer = {
     // 配置信息
     val prop = new Properties
     prop.put("bootstrap.servers", "127.0.0.1:9092")
