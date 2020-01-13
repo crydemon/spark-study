@@ -8,6 +8,7 @@ public class ThinkHashMap {
     public static void main(String[] args) throws InterruptedException {
         map.put(5, "C");
 
+        map.forEach((k, v) -> { System.out.println(k); System.out.println(v);});
         new Thread("Thread1") {
             public void run() {
                 map.put(7, "B");

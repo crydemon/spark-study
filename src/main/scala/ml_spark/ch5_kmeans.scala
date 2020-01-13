@@ -11,7 +11,7 @@ object RunKMeans {
 
   def main(args: Array[String]): Unit = {
     val spark = utils.util.initSpark("kmeans")
-    val basePath = "D:\\datas\\"
+    val basePath = "D:\\datas\\analytics\\"
     val data = spark.read.
       option("inferSchema", true).
       option("header", false).
@@ -101,6 +101,7 @@ class RunKMeans(private val spark: SparkSession) {
     val pipeline = new Pipeline().setStages(Array(assembler, kmeans))
 
     val kmeansModel = pipeline.fit(data).stages.last.asInstanceOf[KMeansModel]
+    //最小化SSE(误差平方和)来逐步迭代求解质心
     kmeansModel.summary.trainingCost
   }
 
@@ -125,9 +126,7 @@ class RunKMeans(private val spark: SparkSession) {
 
   def clusteringTake1(data: DataFrame): Unit = {
     val numericOnly = data.drop("protocol_type", "service", "flag").cache()
-    println("clusteringScore0")
     (20 to 100 by 20).map(k => (k, clusteringScore0(numericOnly, k))).foreach(println)
-    println("clusteringScore1")
     (20 to 100 by 20).map(k => (k, clusteringScore1(numericOnly, k))).foreach(println)
     numericOnly.unpersist()
   }
@@ -138,12 +137,15 @@ class RunKMeans(private val spark: SparkSession) {
     val assembler = new VectorAssembler().
       setInputCols(data.columns.filter(_ != "label")).
       setOutputCol("featureVector")
-
+//
+//    StandardScaler transforms a dataset of Vector rows, normalizing each feature to have unit standard deviation and/or zero mean. It takes parameters:
+//
+//      withStd: True by default. Scales the data to unit standard deviation.
+//      withMean: False by default. Centers the data with mean before scaling. It will build a dense output, so take care when applying to sparse input.
     val scaler = new StandardScaler()
       .setInputCol("featureVector")
       .setOutputCol("scaledFeatureVector")
-      .setWithStd(true)
-      .setWithMean(false)
+
 
     val kmeans = new KMeans().
       setSeed(Random.nextLong()).
@@ -169,6 +171,8 @@ class RunKMeans(private val spark: SparkSession) {
   // Clustering, Take 3
 
   def oneHotPipeline(inputCol: String): (Pipeline, String) = {
+    //This encoding allows algorithms which expect continuous features, such as Logistic Regression, to use categorical features.
+    // For string type input data, it is common to encode categorical features using StringIndexer first.
     val indexer = new StringIndexer().
       setInputCol(inputCol).
       setOutputCol(inputCol + "_indexed")
