@@ -20,7 +20,7 @@ object KafkaUtil {
       s"${kafkaHome}bin\\windows\\zookeeper-server-start.bat ${kafkaHome}config\\zookeeper.properties ".!
     }
     val f2 = Future {
-      s"${kafkaHome}bin\\windows\\kafka-server-start.bat  ${kafkaHome}config\\server.properties &".!
+      s"${kafkaHome}bin\\windows\\kafka-server-start.bat  ${kafkaHome}config\\server.properties ".!
     }
     Await.result(f1, Duration.Inf)
     Await.result(f2, Duration.Inf)
