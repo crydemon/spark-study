@@ -51,9 +51,12 @@ class MysqlSink(url:String, userName:String, pwd:String) extends  ForeachWriter 
   //创建连接对象
   var conn:Connection = _
   //建立连接
+  var i = 0
   override def open(partitionId: Long, epochId: Long): Boolean = {
     Class.forName("com.mysql.cj.jdbc.Driver")
     conn=DriverManager.getConnection(url,userName,pwd)
+    println(i + 1)
+    i = i +1
     true
   }
   //数据写入mysql

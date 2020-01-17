@@ -1,6 +1,11 @@
 package jvm;
 
 
+import org.apache.commons.collections.map.HashedMap;
+
+import java.util.Map;
+import java.util.Set;
+
 public class TestJoin {
 
     static class Reordering {
@@ -35,6 +40,12 @@ public class TestJoin {
     }
 
     public static void main(String[] args) throws InterruptedException {
-        joinTest();
+        //joinTest();
+        Map<String, Integer> map = new HashedMap();
+        map.put("1", 2);
+        map.put("2", 3);
+        Set<String> keys =map.keySet();
+        map.values();
+        keys.forEach(x -> System.out.println(x + "," +map.get(x)));
     }
 }
