@@ -1,6 +1,6 @@
 package ml_spark.datastatis
 
-
+//Calculating the correlation between two series of data is a common operation in Statistics.
 object Correlation extends App {
   import org.apache.spark.ml.linalg.{Matrix, Vectors}
   import org.apache.spark.ml.stat.{Correlation => corr}
