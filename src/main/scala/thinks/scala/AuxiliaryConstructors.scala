@@ -1,4 +1,5 @@
-package programer
+package thinks.scala
+
 //
 //
 //There are several important points to this recipe:
