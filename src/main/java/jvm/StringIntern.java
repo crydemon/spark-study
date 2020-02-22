@@ -24,3 +24,46 @@ public class StringIntern {
 //这个错是因为GC占用了多余98%（默认值）的CPU时间却只回收了少于2%（默认值）的堆空间。
 // 目的是为了让应用终止，给开发者机会去诊断问题。一般是应用程序在有限的内存上创建了大量的临时对象或者弱引用对象，从而导致该异常。
 // 虽然加大内存可以暂时解决这个问题，但是还是强烈建议去优化代码，后者更加有效，也可通过UseGCOverheadLimit避免[不推荐，这里是因为测试用，并不能解决根本问题]
+
+class A{
+    public void setX(int x) {
+        this.x = x;
+    }
+
+    public void setY(int y) {
+        this.y = y;
+    }
+
+    int x;
+    int y;
+
+    public void setName(String name) {
+        this.name = name;
+    }
+
+    public void setAge(String age) {
+        this.age = age;
+    }
+
+    String name;
+    String age;
+
+}
+class dec{
+
+    public static A case1(int x){
+        A a = new A();
+        a.setX(x);
+        return a;
+    }
+    public static A case2(String name, String age){
+        A a = new A();
+        a.setName(name);
+        a.setAge(age);
+        return a;
+    }
+    public static void main(String[] args) {
+        dec.case2("zhangsan", "10");
+        dec.case2("lisi", "12");
+    }
+}
