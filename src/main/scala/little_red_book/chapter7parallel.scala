@@ -1,5 +1,5 @@
 package little_red_book
 
-class chapter2 {
+class chapter7parallel {
 
 }

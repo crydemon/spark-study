@@ -1,0 +1,5 @@
+package algo
+
+class SkipList {
+
+}
