@@ -1,45 +1,38 @@
-import java.util.Random
+
 
 import org.apache.spark.sql.SparkSession
+import org.apache.spark.sql.{functions => F}
 
-/**
-  * Usage: GroupByTest [numMappers] [numKVPairs] [valSize] [numReducers]
-  */
 object GroupByTest {
   def main(args: Array[String]) {
 
-    val numMappers = 100
-    val numKVPairs = 10000
-    val valSize = 1000
-    val numReducers = 36
-
     val spark = SparkSession.builder()
       .appName("GroupBy Test")
-      .master("local[4]")
-      .config("spark.sql.session.timeZone", "UTC")
-      .config("spark.default.parallelism", "18")
-      .config("spark.cores.max", "6")
-      .config("spark.sql.parquet.writeLegacyFormat", "true")
+      .master("local[*]")
       .getOrCreate()
+    spark.sparkContext.setLogLevel("WARN")
 
-    val pairs1 = spark.sparkContext.parallelize(0 until numMappers, numMappers).flatMap { p =>
-      val ranGen = new Random
-      var arr1 = new Array[(Int, Array[Byte])](numKVPairs)
-      for (i <- 0 until numKVPairs) {
-        val byteArr = new Array[Byte](valSize)
-        ranGen.nextBytes(byteArr)
-        arr1(i) = (ranGen.nextInt(Int.MaxValue), byteArr)
-      }
-      arr1
-    }.cache()
-    pairs1.count
-
-    println(pairs1.groupByKey(numReducers).count)
+    println("init end")
+    val seq = Seq(('a', 1), ('b', 2), ('c', 3), ('c', 3), ('c', 3), ('c', 3), ('c', 3), ('c', 3))
+    val rdd = spark.sparkContext.makeRDD(seq)
+    println(rdd.getNumPartitions)
+    val shuffleRdd =rdd.reduceByKey((x, y) => x + y)
+    println(shuffleRdd.toDebugString)
+    shuffleRdd.foreach(tup => println(tup._1 + "," + tup._2))
 
 
-    println(pairs1.toDebugString)
+    val sc = spark.sparkContext
+    val data = sc.parallelize(List("a c", "a b", "b c", "b d", "c d"), 2)
+    val wordcount = data.flatMap(_.split(" ")).map((_, 1)).reduceByKey(_ + _).map(x => (x._2, x._1)).reduceByKey(_ + _)
 
+
+    val data2 = sc.parallelize(List("a c", "a b", "b c", "b d", "c d"), 2)
+    val wordcount2 = data2.flatMap(_.split(" ")).map((_, 1)).reduceByKey(_ + _).map(x => (x._2, x._1)).reduceByKey(_ + _)
+
+
+    val rdd2 = wordcount.join(wordcount2)
+    println(rdd2.toDebugString)
     spark.stop()
-    Thread.sleep(100000000)
+
   }
 }
