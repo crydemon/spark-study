@@ -36,11 +36,11 @@ object RunKMeans {
 
     val runKMeans = new RunKMeans(spark)
 
-    runKMeans.clusteringTake0(data)
-    runKMeans.clusteringTake1(data)
-    runKMeans.clusteringTake2(data)
-    runKMeans.clusteringTake3(data)
-    runKMeans.clusteringTake4(data)
+//    runKMeans.clusteringTake0(data)
+//    runKMeans.clusteringTake1(data)
+//    runKMeans.clusteringTake2(data)
+//    runKMeans.clusteringTake3(data)
+//    runKMeans.clusteringTake4(data)
     runKMeans.buildAnomalyDetector(data)
 
     data.unpersist()
@@ -316,7 +316,7 @@ class RunKMeans(private val spark: SparkSession) {
       val vec = row.getAs[Vector]("scaledFeatureVector")
       Vectors.sqdist(centroids(cluster), vec) >= threshold
     }.select(originalCols.head, originalCols.tail:_*)
-
+    anomalies.show(200)
     println(anomalies.first())
   }
 

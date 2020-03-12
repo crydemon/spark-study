@@ -1,4 +1,4 @@
-package thinks.spark
+package spark
 
 import org.apache.hadoop.fs.Path
 import org.apache.spark.SparkConf
@@ -256,7 +256,7 @@ object TestApp extends App {
   val conf = new SparkConf().setAppName("spark-custom-datasource")
   val spark = SparkSession.builder().config(conf).master("local[2]").getOrCreate()
   import spark.implicits._
-  val df = spark.sqlContext.read.format("thinks.spark.DefaultSource").load("D:\\datas\\users")
+  val df = spark.sqlContext.read.format("spark.DefaultSource").load("D:\\datas\\users")
   //println("output schema...")
   //df.printSchema()
   df.foreach(r => println(r.toSeq))
@@ -271,9 +271,9 @@ object TestApp extends App {
       |""".stripMargin)
       .show()
   //save the data
-//  df.write.options(Map("format" -> "customFormat")).mode(SaveMode.Overwrite).format("thinks.spark.DefaultSource").save("d://Users//Downloads/out_custom/")
-//  df.write.options(Map("format" -> "json")).mode(SaveMode.Overwrite).format("thinks.spark.DefaultSource").save("d://Users//Downloads/out_json/")
-//  df.write.mode(SaveMode.Overwrite).format("thinks.spark.DefaultSource").save("d://Users//Downloads/out_none/")
+//  df.write.options(Map("format" -> "customFormat")).mode(SaveMode.Overwrite).format("spark.DefaultSource").save("d://Users//Downloads/out_custom/")
+//  df.write.options(Map("format" -> "json")).mode(SaveMode.Overwrite).format("spark.DefaultSource").save("d://Users//Downloads/out_json/")
+//  df.write.mode(SaveMode.Overwrite).format("spark.DefaultSource").save("d://Users//Downloads/out_none/")
   println("Application Ended...")
 }
 

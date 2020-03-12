@@ -1,4 +1,4 @@
-package thinks.spark
+package spark
 
 object DirtyWork extends App {
 
