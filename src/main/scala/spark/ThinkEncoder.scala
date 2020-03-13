@@ -1,4 +1,4 @@
-package thinks.spark
+package spark
 
 import org.apache.spark.sql.Encoders
 import org.apache.spark.sql.catalyst.encoders.RowEncoder

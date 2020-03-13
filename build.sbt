@@ -37,6 +37,8 @@ libraryDependencies += "org.typelevel" %% "cats-core" % "1.6.0"
 // https://mvnrepository.com/artifact/io.circe/circe-core
 libraryDependencies += "io.circe" %% "circe-core" % "0.11.1"
 
+libraryDependencies += "com.snowplowanalytics" %% "snowplow-scala-analytics-sdk" % "0.4.1" exclude("com.amazonaws", "aws-java-sdk-s3") exclude("com.amazonaws", "aws-java-sdk-dynamodb")
+
 // https://mvnrepository.com/artifact/com.squareup.okhttp3/okhttp
 libraryDependencies += "com.squareup.okhttp3" % "okhttp" % "3.14.2"
 
@@ -50,3 +52,5 @@ libraryDependencies += "org.apache.kafka" % "kafka-clients" % "2.4.0" exclude("o
 
 // https://mvnrepository.com/artifact/org.apache.spark/spark-sql-kafka-0-10
 libraryDependencies += "org.apache.spark" %% "spark-sql-kafka-0-10" % "2.4.4" exclude("org.slf4j", "slf4j-jdk14")
+
+libraryDependencies += "com.qubole.spark" % "spark-sql-kinesis_2.11" % "1.1.3-spark_2.4"
