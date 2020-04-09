@@ -1,10 +1,13 @@
+import java.lang.reflect.Array;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.stream.Stream;
 
 public class Main {
 
     public static int maxLen(String strs) {
+
         if(strs == null || strs.isEmpty()) return 0;
         int result = 0;
         String curStr = "";

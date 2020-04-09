@@ -10,7 +10,8 @@ libraryDependencies ++= Seq(
   "org.apache.spark" %% "spark-sql" % "2.4.5",
   // https://mvnrepository.com/artifact/org.apache.spark/spark-mllib
   "org.apache.spark" %% "spark-mllib" % "2.4.5",
-    // https://mvnrepository.com/artifact/com.redislabs/spark-redis
+  "org.apache.spark" %% "spark-hive" % "2.4.5",
+  // https://mvnrepository.com/artifact/com.redislabs/spark-redis
   "com.redislabs" % "spark-redis" % "2.4.1"
 
 )

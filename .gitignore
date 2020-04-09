@@ -15,3 +15,4 @@ output
 .cache-main
 .cache-tests
 /bin/
+/metastore_db/
